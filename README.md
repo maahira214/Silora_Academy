@@ -68,11 +68,10 @@ Users can only sign in if Silora has created their account with that Google emai
 2. **Google Workspace API (recommended).** One paid Workspace account (for example `classes@siloraacademy.com`) owns every Meet space. The app creates spaces through the Meet REST API and adds the teacher and student Gmail accounts as members, so they join without knocking.
    It also reads Meet participant data for real attendance. Workspace removes the 60-minute limit. Teachers and students keep their personal Gmail. The code is ready for this (`meetMode`, `meetSpaceName`), but it needs real Workspace credentials to build and test.
 
-## Production checklist (not done yet)
+## Production
 
-- Hosting: Cloud Run plus Cloud SQL (Postgres), with Cloud Scheduler calling `POST /api/cron/tick` every minute (Bearer `CRON_SECRET`, add `?extend=1` hourly).
-- File storage: swap `src/server/storage.ts` to a private Google Cloud Storage bucket and add malware scanning.
-- Email/push notifications (in-app notifications exist today).
-- Real-time chat currently polls every 3 seconds. That's fine at Silora's scale, and it can move to WebSockets later.
-- Backups, error tracking, rate limiting on login and uploads, load test of the 6 PM peak.
-- Privacy policy and consent (students are often minors), plus retention periods.
+Production runs on one AWS Lightsail server (Mumbai) with Docker Compose: app, class monitor, PostgreSQL, nightly backups to Cloudflare R2, and Caddy for HTTPS.
+Chat files are stored in R2 (`STORAGE_DRIVER="r2"`). Errors go to Sentry, and `/api/health` is the uptime check.
+Full steps, including how to upgrade the server: **[deploy/README.md](deploy/README.md)**.
+
+Still to do (later phases): email notifications, rate limiting on sign-in and uploads, malware scanning of uploads, a load test of the 6 PM peak, and the privacy policy and consent text (students are often minors).

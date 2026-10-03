@@ -1,6 +1,6 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { describe, expect, it, vi } from "vitest";
-import { backup, backupKey, newestFirst, restore } from "../scripts/backup.mjs";
+import { backup, backupKey, newestFirst, nextRunAt, restore } from "../scripts/backup.mjs";
 
 const fakeStore = (files: Record<string, Buffer> = {}) => ({
   files,
@@ -52,5 +52,15 @@ describe("database backups", () => {
     expect(restored).toBe("new");
     expect(exec.mock.calls[0][0]).toBe("pg_restore");
     expect(exec.mock.calls[0][1]).toEqual(expect.arrayContaining(["--clean", "--if-exists", "--single-transaction"]));
+  });
+});
+
+describe("nextRunAt", () => {
+  it("runs at 21:30 UTC the same day when that is still ahead", () => {
+    expect(nextRunAt(new Date("2026-10-03T10:00:00Z")).toISOString()).toBe("2026-10-03T21:30:00.000Z");
+  });
+  it("rolls over to the next day after 21:30 UTC", () => {
+    expect(nextRunAt(new Date("2026-10-03T21:30:00Z")).toISOString()).toBe("2026-10-04T21:30:00.000Z");
+    expect(nextRunAt(new Date("2026-10-31T23:00:00Z")).toISOString()).toBe("2026-11-01T21:30:00.000Z");
   });
 });

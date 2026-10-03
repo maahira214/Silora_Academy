@@ -18,7 +18,7 @@ Tutoring operations platform for Silora Academy (siloraacademy.com): admin/opera
 ## Build plan (user must confirm before each phase)
 
 0. Working prototype — done.
-1. Test site online (server, HTTPS, Google sign-in, backups, R2, error alerts) — decisions answered; **waiting for user to confirm the re-scoped Phase 1** (server-independent parts now, actual server + DNS at the end).
+1. Test site online — confirmed 2026-10-03 and re-scoped: server-independent parts built (git, R2 storage, Sentry, /api/health, R2 backups, Docker Compose + Caddy, CI/deploy workflows, create-admin script; see deploy/README.md). **Remaining, at the end:** user creates accounts (R2, Google OAuth, Sentry, GitHub), then Lightsail server + one DNS record via the website developer.
 2. Make it simple (screen changes listed in the build plan doc).
 3. Connect Google Meet (free-Meet test, then Workspace automation if chosen).
 4. Real data (CSV import), email notifications, rate limits, security test pass.
@@ -33,4 +33,6 @@ Planning docs (Claude Docs): product "What You Get" https://claude.ai/code/artif
 - Local DB: `npm run db` (embedded Postgres on :5433). Then `npm run dev`, `npm run worker`. Checks: `npm test`, `npm run typecheck`, `npm run lint`, `npm run build`.
 - `prisma migrate dev` fails in this non-interactive environment and `migrate reset` is blocked; create migrations with `npx prisma migrate diff --from-url <DATABASE_URL> --to-schema-datamodel prisma/schema.prisma --script` into a new `prisma/migrations/<timestamp>_<name>/migration.sql`, then `npx prisma migrate deploy`.
 - npm 11 blocks install scripts: new packages with postinstall need `npm approve-scripts <pkg>`.
-- Git repository not initialised yet (first step of Phase 1).
+- Git: branch `main`, no remote yet (user creates the private GitHub repo). `.gitattributes` forces LF so deploy scripts run on Linux.
+- Production config lives in `deploy/` (compose.yaml, Caddyfile, .env.production.example, setup/deploy/restore scripts). Docker is not installed on the dev machine, so the Docker stack is only exercised on the server.
+- Chat uploads go through a Server Action: `next.config.ts` raises `serverActions.bodySizeLimit` and `proxyClientMaxBodySize` to 51mb (defaults 1 MB / 10 MB).

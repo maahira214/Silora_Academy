@@ -1,0 +1,12 @@
+.git
+.next
+node_modules
+.pgdata
+storage
+coverage
+.env
+.env.*
+!.env.example
+deploy/.env
+*.log
+.claude

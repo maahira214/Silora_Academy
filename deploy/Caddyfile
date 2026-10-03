@@ -1,0 +1,17 @@
+# HTTPS for the app. Caddy gets and renews the Let's Encrypt certificate by itself once
+# APP_DOMAIN (app.siloraacademy.com) points at this server.
+{$APP_DOMAIN} {
+	encode zstd gzip
+	# Chat uploads are limited in the app (Settings → max upload size, up to 50 MB); this is a hard ceiling.
+	request_body {
+		max_size 55MB
+	}
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		X-Frame-Options "DENY"
+		-Server
+	}
+	reverse_proxy app:3000
+}

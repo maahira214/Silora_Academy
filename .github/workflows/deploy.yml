@@ -1,0 +1,38 @@
+# Automatic updates: after CI passes on main, log in to the server and run deploy/deploy.sh.
+# Does nothing until these repository secrets are set (Settings → Secrets and variables → Actions):
+#   DEPLOY_HOST  server address (Lightsail static IP)
+#   DEPLOY_USER  usually "ubuntu"
+#   DEPLOY_KEY   private SSH key allowed to log in to the server
+#   DEPLOY_PATH  repository folder on the server, e.g. /home/ubuntu/silora
+name: Deploy
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+concurrency: deploy
+
+jobs:
+  deploy:
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    env:
+      CONFIGURED: ${{ secrets.DEPLOY_HOST != '' }}
+    steps:
+      - name: Skip until the server is connected
+        if: env.CONFIGURED != 'true'
+        run: echo "No DEPLOY_HOST secret yet; nothing to deploy."
+      - name: Deploy over SSH
+        if: env.CONFIGURED == 'true'
+        env:
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          USER: ${{ secrets.DEPLOY_USER }}
+          KEY: ${{ secrets.DEPLOY_KEY }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "$HOST" >> ~/.ssh/known_hosts
+          ssh -i ~/.ssh/deploy_key "$USER@$HOST" "cd '$DEPLOY_PATH' && bash deploy/deploy.sh"

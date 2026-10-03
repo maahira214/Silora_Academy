@@ -1,6 +1,7 @@
 // Database backups to Cloudflare R2.
 //
-//   node scripts/backup.mjs backup              dump the database and upload it to R2
+//   node scripts/backup.mjs schedule            run forever: back up daily at 21:30 UTC (3 AM India time)
+//   node scripts/backup.mjs backup              dump the database and upload it to R2 now
 //   node scripts/backup.mjs list                list backups in R2, newest first
 //   node scripts/backup.mjs restore [key]       download a backup (default: newest) and restore it
 //
@@ -98,15 +99,43 @@ export async function restore(key, { store = r2(), dbUrl = process.env.DATABASE_
   }
 }
 
+/** Next 21:30 UTC (3:00 AM India time, outside class hours) after `now`. */
+export function nextRunAt(now = new Date()) {
+  const next = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 21, 30));
+  if (next <= now) next.setUTCDate(next.getUTCDate() + 1);
+  return next;
+}
+
+const backupTime = (key) => {
+  const m = key.match(/silora-(d{4}-d{2}-d{2})T(d{2})(d{2})Z.dump$/);
+  return m ? new Date(`${m[1]}T${m[2]}:${m[3]}:00Z`) : null;
+};
+
+async function schedule() {
+  const store = r2();
+  const tryBackup = () => backup({ store }).catch((e) => console.error(`${new Date().toISOString()} backup FAILED: ${e.message}`));
+  // On a fresh or restarted server, take a backup straight away if the newest one is over a day old.
+  const newest = newestFirst(await store.list(PREFIX).catch(() => []))[0];
+  const newestAt = newest && backupTime(newest);
+  if (!newestAt || Date.now() - newestAt.getTime() > 24 * 3_600_000) await tryBackup();
+  for (;;) {
+    const at = nextRunAt();
+    console.log(`Next backup at ${at.toISOString()}`);
+    await new Promise((r) => setTimeout(r, at.getTime() - Date.now()));
+    await tryBackup();
+  }
+}
+
 if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith("backup.mjs")) {
   const [cmd, arg] = process.argv.slice(2);
   const actions = {
+    schedule,
     backup: () => backup(),
     restore: () => restore(arg),
     list: async () => newestFirst(await r2().list(PREFIX)).forEach((k) => console.log(k)),
   };
   if (!actions[cmd]) {
-    console.error("Usage: node scripts/backup.mjs backup | list | restore [key]");
+    console.error("Usage: node scripts/backup.mjs schedule | backup | list | restore [key]");
     process.exit(2);
   }
   actions[cmd]().catch((e) => {

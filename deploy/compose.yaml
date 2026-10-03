@@ -1,0 +1,102 @@
+# Silora Academy production stack: one server runs everything.
+#   caddy   HTTPS (automatic Let's Encrypt certificates) in front of the app
+#   app     the Next.js app
+#   worker  the class monitor, calls the app every minute
+#   db      PostgreSQL 17 (the only data kept on the server; backed up nightly to R2)
+#   backup  nightly pg_dump to Cloudflare R2
+#   migrate applies database migrations, then exits (runs before the app starts)
+#
+# Settings come from deploy/.env (copy deploy/.env.production.example). Usage: see deploy/README.md.
+name: silora
+
+x-app-image: &app-image
+  image: silora-app:latest
+  build:
+    context: ..
+    args:
+      NEXT_PUBLIC_SENTRY_DSN: ${NEXT_PUBLIC_SENTRY_DSN:-}
+      NEXT_PUBLIC_SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-production}
+  env_file: .env
+  environment: &app-env
+    DATABASE_URL: postgresql://silora:${POSTGRES_PASSWORD}@db:5432/silora
+    STORAGE_DRIVER: r2
+  restart: unless-stopped
+  logging: &logging
+    driver: json-file
+    options: { max-size: "10m", max-file: "5" }
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: silora
+      POSTGRES_USER: silora
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in deploy/.env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U silora -d silora"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    logging: *logging
+
+  migrate:
+    <<: *app-image
+    command: ["npx", "prisma", "migrate", "deploy"]
+    restart: "no"
+    depends_on:
+      db: { condition: service_healthy }
+
+  app:
+    <<: *app-image
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/login').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
+
+  worker:
+    <<: *app-image
+    command: ["node", "scripts/worker.mjs"]
+    environment:
+      <<: *app-env
+      MONITOR_URL: http://app:3000
+    depends_on:
+      app: { condition: service_started }
+
+  backup:
+    build: { context: .., dockerfile: deploy/backup/Dockerfile }
+    image: silora-backup:latest
+    env_file: .env
+    environment: *app-env
+    restart: unless-stopped
+    depends_on:
+      db: { condition: service_healthy }
+    logging: *logging
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN:?set APP_DOMAIN in deploy/.env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      app: { condition: service_started }
+    logging: *logging
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:
