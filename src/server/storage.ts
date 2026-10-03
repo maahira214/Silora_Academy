@@ -1,6 +1,6 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve, sep } from "node:path";
 import { AwsClient } from "aws4fetch";
 
@@ -15,6 +15,7 @@ import { AwsClient } from "aws4fetch";
 interface Driver {
   put(key: string, data: Buffer, contentType: string): Promise<void>;
   get(key: string): Promise<Buffer>;
+  list(prefix: string): Promise<string[]>;
 }
 
 const localDriver = (): Driver => {
@@ -31,6 +32,10 @@ const localDriver = (): Driver => {
       await writeFile(path, data);
     },
     get: (key) => readFile(pathFor(key)),
+    async list(prefix) {
+      const files = await readdir(base, { recursive: true }).catch(() => [] as string[]);
+      return files.map((f) => f.split(sep).join("/")).filter((k) => k.startsWith(prefix));
+    },
   };
 };
 
@@ -63,6 +68,19 @@ export function r2Driver(env: NodeJS.ProcessEnv = process.env): Driver {
       if (!res.ok) throw new Error(`R2 download failed (${res.status}) for ${key}`);
       return Buffer.from(await res.arrayBuffer());
     },
+    async list(prefix) {
+      const keys: string[] = [];
+      let token: string | undefined;
+      do {
+        const q = new URLSearchParams({ "list-type": "2", prefix, ...(token ? { "continuation-token": token } : {}) });
+        const res = await client.fetch(`https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com/${R2_BUCKET}?${q}`);
+        if (!res.ok) throw new Error(`R2 list failed (${res.status})`);
+        const xml = await res.text();
+        keys.push(...[...xml.matchAll(/<Key>([^<]+)<\/Key>/g)].map((m) => m[1]));
+        token = xml.includes("<IsTruncated>true</IsTruncated>") ? xml.match(/<NextContinuationToken>([^<]+)</)?.[1] : undefined;
+      } while (token);
+      return keys;
+    },
   };
 }
 
@@ -80,8 +98,9 @@ export function getObject(key: string) {
   return storage().get(key);
 }
 
-/** For the health check: confirms the configured storage is set up, without touching files. */
-export const storageDriverName = () => (process.env.STORAGE_DRIVER === "r2" ? "r2" : "local");
+export function listObjects(prefix: string) {
+  return storage().list(prefix);
+}
 
 export const ALLOWED_UPLOADS: Record<string, { mime: string; inline: boolean }> = {
   ".jpg": { mime: "image/jpeg", inline: true },

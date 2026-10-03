@@ -1,9 +1,10 @@
-// Class monitor loop for local development: calls the tick endpoint every minute.
-// In production use Cloud Scheduler (or any cron) to POST /api/cron/tick instead.
-import { readFileSync } from "node:fs";
+// Class monitor loop: calls the tick endpoint every minute.
+// Locally: npm run worker (reads .env). In production the worker container runs this with
+// MONITOR_URL pointing at the app container and CRON_SECRET from the environment.
+import { existsSync, readFileSync } from "node:fs";
 
 const env = Object.fromEntries(
-  readFileSync(".env", "utf8")
+  (existsSync(".env") ? readFileSync(".env", "utf8") : "")
     .split(/\r?\n/)
     .filter((l) => /^[A-Z_]+=/.test(l))
     .map((l) => {
@@ -11,7 +12,7 @@ const env = Object.fromEntries(
       return [l.slice(0, i), l.slice(i + 1).replace(/^"|"$/g, "")];
     }),
 );
-const base = process.env.APP_URL || env.APP_URL || "http://localhost:3000";
+const base = process.env.MONITOR_URL || process.env.APP_URL || env.APP_URL || "http://localhost:3000";
 const secret = process.env.CRON_SECRET || env.CRON_SECRET;
 let lastExtend = 0;
 
