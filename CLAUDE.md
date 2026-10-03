@@ -33,6 +33,6 @@ Planning docs (Claude Docs): product "What You Get" https://claude.ai/code/artif
 - Local DB: `npm run db` (embedded Postgres on :5433). Then `npm run dev`, `npm run worker`. Checks: `npm test`, `npm run typecheck`, `npm run lint`, `npm run build`.
 - `prisma migrate dev` fails in this non-interactive environment and `migrate reset` is blocked; create migrations with `npx prisma migrate diff --from-url <DATABASE_URL> --to-schema-datamodel prisma/schema.prisma --script` into a new `prisma/migrations/<timestamp>_<name>/migration.sql`, then `npx prisma migrate deploy`.
 - npm 11 blocks install scripts: new packages with postinstall need `npm approve-scripts <pkg>`.
-- Git: branch `main`, no remote yet (user creates the private GitHub repo). `.gitattributes` forces LF so deploy scripts run on Linux.
+- Git: branch `main`. Code is hosted in a **private** GitHub repo on the user's "Maahira Begum S" GitHub account (commit identity Maahira Begum S); the user creates the repo, then it is added as `origin`. `.gitattributes` forces LF so deploy scripts run on Linux.
 - Production config lives in `deploy/` (compose.yaml, Caddyfile, .env.production.example, setup/deploy/restore scripts). Docker is not installed on the dev machine, so the Docker stack is only exercised on the server.
 - Chat uploads go through a Server Action: `next.config.ts` raises `serverActions.bodySizeLimit` and `proxyClientMaxBodySize` to 51mb (defaults 1 MB / 10 MB).
