@@ -1,32 +1,87 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { dirname, join, resolve, sep } from "node:path";
+import { dirname, resolve, sep } from "node:path";
+import { AwsClient } from "aws4fetch";
 
 /**
  * Private file storage for chat attachments. Files are only ever served
  * through /api/files/[id], which checks the viewer's access every time.
  *
- * Local disk in development. For production swap this module for Google
- * Cloud Storage / S3 (same two functions) — files must never be public.
+ * STORAGE_DRIVER="local" (default) keeps files on disk under STORAGE_DIR, for development.
+ * STORAGE_DRIVER="r2" keeps them in a private Cloudflare R2 bucket, for production, so
+ * the server holds no files and can be resized or replaced freely.
  */
-const root = () => resolve(/*turbopackIgnore: true*/ process.cwd(), process.env.STORAGE_DIR || "./storage");
+interface Driver {
+  put(key: string, data: Buffer, contentType: string): Promise<void>;
+  get(key: string): Promise<Buffer>;
+}
+
+const localDriver = (): Driver => {
+  const base = resolve(/*turbopackIgnore: true*/ process.cwd(), process.env.STORAGE_DIR || "./storage");
+  const pathFor = (key: string) => {
+    const path = resolve(/*turbopackIgnore: true*/ base, key);
+    if (!path.startsWith(base + sep)) throw new Error("Invalid storage key");
+    return path;
+  };
+  return {
+    async put(key, data) {
+      const path = pathFor(key);
+      await mkdir(dirname(path), { recursive: true });
+      await writeFile(path, data);
+    },
+    get: (key) => readFile(pathFor(key)),
+  };
+};
+
+export function r2Driver(env: NodeJS.ProcessEnv = process.env): Driver {
+  const { R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET } = env;
+  if (!R2_ACCOUNT_ID || !R2_ACCESS_KEY_ID || !R2_SECRET_ACCESS_KEY || !R2_BUCKET) {
+    throw new Error("STORAGE_DRIVER=r2 needs R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY and R2_BUCKET");
+  }
+  const client = new AwsClient({
+    accessKeyId: R2_ACCESS_KEY_ID,
+    secretAccessKey: R2_SECRET_ACCESS_KEY,
+    service: "s3",
+    region: "auto",
+  });
+  const urlFor = (key: string) => {
+    if (!/^[\w./-]+$/.test(key) || key.split("/").includes("..")) throw new Error("Invalid storage key");
+    return `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com/${R2_BUCKET}/${key}`;
+  };
+  return {
+    async put(key, data, contentType) {
+      const res = await client.fetch(urlFor(key), {
+        method: "PUT",
+        body: new Uint8Array(data),
+        headers: { "Content-Type": contentType },
+      });
+      if (!res.ok) throw new Error(`R2 upload failed (${res.status}): ${await res.text()}`);
+    },
+    async get(key) {
+      const res = await client.fetch(urlFor(key));
+      if (!res.ok) throw new Error(`R2 download failed (${res.status}) for ${key}`);
+      return Buffer.from(await res.arrayBuffer());
+    },
+  };
+}
+
+let driver: Driver | undefined;
+const storage = () => (driver ??= process.env.STORAGE_DRIVER === "r2" ? r2Driver() : localDriver());
 
 export async function putObject(data: Buffer, ext: string) {
   const now = new Date();
-  const key = `${now.getUTCFullYear()}/${String(now.getUTCMonth() + 1).padStart(2, "0")}/${randomUUID()}${ext}`;
-  const path = join(/*turbopackIgnore: true*/ root(), key);
-  await mkdir(dirname(path), { recursive: true });
-  await writeFile(path, data);
+  const key = `uploads/${now.getUTCFullYear()}/${String(now.getUTCMonth() + 1).padStart(2, "0")}/${randomUUID()}${ext}`;
+  await storage().put(key, data, ALLOWED_UPLOADS[ext]?.mime ?? "application/octet-stream");
   return key;
 }
 
-export async function getObject(key: string) {
-  const base = root();
-  const path = resolve(/*turbopackIgnore: true*/ base, key);
-  if (!path.startsWith(base + sep)) throw new Error("Invalid storage key");
-  return readFile(path);
+export function getObject(key: string) {
+  return storage().get(key);
 }
+
+/** For the health check: confirms the configured storage is set up, without touching files. */
+export const storageDriverName = () => (process.env.STORAGE_DRIVER === "r2" ? "r2" : "local");
 
 export const ALLOWED_UPLOADS: Record<string, { mime: string; inline: boolean }> = {
   ".jpg": { mime: "image/jpeg", inline: true },
