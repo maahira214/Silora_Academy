@@ -1,0 +1,42 @@
+@import "tailwindcss";
+
+/* Silora Academy brand — taken from siloraacademy.com */
+@theme {
+  --font-sans: var(--font-montserrat), ui-sans-serif, system-ui, sans-serif;
+
+  --color-gold-50: #fdf8e7;
+  --color-gold-100: #fbefc4;
+  --color-gold-200: #f6dd87;
+  --color-gold-300: #f0c94b;
+  --color-gold-400: #ecbc2c;
+  --color-gold-500: #e8b112;
+  --color-gold-600: #c9950c;
+  --color-gold-700: #a0730c;
+  --color-gold-800: #7e5a10;
+
+  --color-navy-50: #eef4f9;
+  --color-navy-100: #d6e3ee;
+  --color-navy-200: #adc6dc;
+  --color-navy-300: #7fa3c3;
+  --color-navy-400: #4c7aa0;
+  --color-navy-500: #2a5a82;
+  --color-navy-600: #1a4466;
+  --color-navy-700: #123754;
+  --color-navy-800: #0a2d4a;
+  --color-navy-900: #082339;
+  --color-navy-950: #051726;
+}
+
+html {
+  color-scheme: light;
+}
+
+body {
+  background: var(--color-slate-50);
+  color: var(--color-slate-900);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-gold-500);
+  outline-offset: 2px;
+}

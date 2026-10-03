@@ -1,0 +1,426 @@
+// Silora Academy — Tutoring Operations Platform
+//
+// Core idea: a Course is one Silora-managed teaching relationship
+// (Student + Teacher + Subject for 1:1, or one group class). Each Course owns
+// exactly one permanent Google Meet link, one chat, and its schedules. Every
+// lesson (ClassSession) reuses the Course's Meet link.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  SUPER_ADMIN
+  OPERATIONS
+  TEACHER
+  STUDENT
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  DEACTIVATED
+}
+
+enum ClassType {
+  ONE_TO_ONE
+  GROUP
+}
+
+enum CourseStatus {
+  ACTIVE
+  ENDED
+}
+
+enum MeetMode {
+  MANUAL // admin pastes a Meet link created from Silora's Google account
+  GOOGLE_API // link created and managed through the Google Meet REST API
+}
+
+enum EnrollmentStatus {
+  ACTIVE
+  REMOVED
+}
+
+enum SessionStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+  TEACHER_ABSENT
+  STUDENT_ABSENT
+  NO_SHOW
+  TECHNICAL_ISSUE
+}
+
+enum ThreadKind {
+  COURSE // everyone in the course (teacher + all active students)
+  PRIVATE // teacher + one student inside a group course
+}
+
+enum ThreadStatus {
+  ACTIVE
+  READ_ONLY
+  DISABLED
+}
+
+enum MessageStatus {
+  VISIBLE
+  BLOCKED // never delivered (sender saw a block notice)
+  QUARANTINED // held for admin review
+  REMOVED // removed by an admin
+}
+
+enum ContactPolicy {
+  WARN // deliver, warn the sender, flag for review
+  FLAG // deliver silently, flag for review
+  BLOCK // do not deliver, tell the sender, flag for review
+  QUARANTINE // hold for admin review before delivery
+}
+
+enum AlertSeverity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
+enum AlertStatus {
+  OPEN
+  ACKNOWLEDGED
+  RESOLVED
+}
+
+enum AuditResult {
+  SUCCESS
+  DENIED
+  FAILURE
+}
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  timezone  String   @default("Asia/Kolkata")
+  createdAt DateTime @default(now())
+
+  // Operational settings (configurable by Super Admin)
+  joinOpensMinutesBefore Int           @default(10)
+  reminderMinutesBefore  Int[]         @default([30, 10])
+  teacherGraceMinutes    Int           @default(5)
+  studentGraceMinutes    Int           @default(10)
+  contactPolicy          ContactPolicy @default(WARN)
+  allowPrivateGroupChat  Boolean       @default(true)
+  maxUploadMb            Int           @default(15)
+
+  users     User[]
+  subjects  Subject[]
+  courses   Course[]
+  sessions  ClassSession[]
+  alerts    Alert[]
+  auditLogs AuditLog[]
+}
+
+model User {
+  id          String     @id @default(cuid())
+  orgId       String
+  email       String     @unique // lower-cased Google account email used to sign in
+  name        String
+  role        Role
+  status      UserStatus @default(ACTIVE)
+  phone       String? // private: visible to Silora staff only
+  timezone    String? // falls back to the organization timezone
+  googleSub   String?    @unique
+  lastLoginAt DateTime?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  org            Organization    @relation(fields: [orgId], references: [id])
+  teacherProfile TeacherProfile?
+  studentProfile StudentProfile?
+  authSessions   AuthSession[]
+  teaching       Course[]        @relation("CourseTeacher")
+  enrollments    CourseStudent[]
+  attendance     Attendance[]
+  messages       Message[]
+  threadReads    ThreadRead[]
+  notifications  Notification[]
+  uploads        Attachment[]
+
+  @@index([orgId, role, status])
+}
+
+model TeacherProfile {
+  userId   String  @id
+  headline String? // e.g. "Mathematics Teacher" — shown to students
+  notes    String? // internal, staff only
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model StudentProfile {
+  userId        String  @id
+  grade         String?
+  board         String?
+  guardianName  String? // staff only
+  guardianPhone String? // staff only
+  guardianEmail String? // staff only
+  notes         String? // staff only
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Subject {
+  id    String @id @default(cuid())
+  orgId String
+  name  String
+
+  org     Organization @relation(fields: [orgId], references: [id])
+  courses Course[]
+
+  @@unique([orgId, name])
+}
+
+model Course {
+  id          String       @id @default(cuid())
+  orgId       String
+  title       String
+  type        ClassType
+  subjectId   String
+  teacherId   String
+  grade       String?
+  board       String?
+  status      CourseStatus @default(ACTIVE)
+  timezone    String
+  chatEnabled Boolean      @default(true)
+
+  // The one permanent Meet link for this relationship
+  meetMode      MeetMode @default(MANUAL)
+  meetUrl       String?
+  meetCode      String?  @unique // e.g. abc-defg-hij; unique so links are never shared between relationships
+  meetSpaceName String?  @unique // spaces/{id} when created through the API
+
+  endedAt     DateTime?
+  endedReason String?
+  createdById String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  org       Organization    @relation(fields: [orgId], references: [id])
+  subject   Subject         @relation(fields: [subjectId], references: [id])
+  teacher   User            @relation("CourseTeacher", fields: [teacherId], references: [id])
+  students  CourseStudent[]
+  schedules Schedule[]
+  sessions  ClassSession[]
+  threads   Thread[]
+  alerts    Alert[]
+
+  @@index([orgId, status])
+  @@index([teacherId, status])
+}
+
+model CourseStudent {
+  id        String           @id @default(cuid())
+  courseId  String
+  studentId String
+  status    EnrollmentStatus @default(ACTIVE)
+  addedAt   DateTime         @default(now())
+  removedAt DateTime?
+
+  course  Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  student User   @relation(fields: [studentId], references: [id])
+
+  @@unique([courseId, studentId])
+  @@index([studentId, status])
+}
+
+model Schedule {
+  id          String    @id @default(cuid())
+  courseId    String
+  weekdays    Int[] // 0 = Sunday … 6 = Saturday
+  startTime   String // "18:00", in `timezone`
+  durationMin Int
+  timezone    String
+  validFrom   DateTime // first date (local midnight, stored as UTC instant)
+  validUntil  DateTime? // last date, inclusive; null = open-ended
+  active      Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+
+  course   Course         @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  sessions ClassSession[]
+}
+
+model ClassSession {
+  id               String        @id @default(cuid())
+  orgId            String
+  courseId         String
+  scheduleId       String?
+  slotAt           DateTime? // the recurrence slot this lesson was generated for; never changes
+  startsAt         DateTime
+  endsAt           DateTime
+  status           SessionStatus @default(SCHEDULED)
+  originalStartsAt DateTime? // set when rescheduled
+  cancelReason     String?
+  issueNote        String? // technical issue reported by teacher/student
+  completedAt      DateTime?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  org        Organization @relation(fields: [orgId], references: [id])
+  course     Course       @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  schedule   Schedule?    @relation(fields: [scheduleId], references: [id], onDelete: SetNull)
+  attendance Attendance[]
+  alerts     Alert[]
+
+  // Idempotent generation from a recurring schedule (a moved lesson keeps its slot)
+  @@unique([scheduleId, slotAt])
+  @@index([orgId, startsAt])
+  @@index([courseId, startsAt])
+}
+
+model Attendance {
+  id           String    @id @default(cuid())
+  sessionId    String
+  userId       String
+  firstJoinAt  DateTime? // first click on Join Class in Silora
+  lastJoinAt   DateTime?
+  joinCount    Int       @default(0)
+  meetJoinedAt DateTime? // from Google Meet participant data (API mode)
+  meetLeftAt   DateTime?
+
+  session ClassSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user    User         @relation(fields: [userId], references: [id])
+
+  @@unique([sessionId, userId])
+}
+
+model Thread {
+  id        String       @id @default(cuid())
+  courseId  String
+  kind      ThreadKind
+  studentId String? // PRIVATE threads only
+  status    ThreadStatus @default(ACTIVE)
+  createdAt DateTime     @default(now())
+
+  course   Course       @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  messages Message[]
+  reads    ThreadRead[]
+
+  @@unique([courseId, kind, studentId])
+}
+
+model Message {
+  id           String        @id @default(cuid())
+  threadId     String
+  senderId     String
+  body         String
+  attachmentId String?       @unique
+  status       MessageStatus @default(VISIBLE)
+  flagged      Boolean       @default(false)
+  flagReasons  String[]
+  reviewedAt   DateTime?
+  reviewedById String?
+  createdAt    DateTime      @default(now())
+
+  thread     Thread      @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  sender     User        @relation(fields: [senderId], references: [id])
+  attachment Attachment? @relation(fields: [attachmentId], references: [id])
+
+  @@index([threadId, createdAt])
+  @@index([flagged, reviewedAt])
+}
+
+model ThreadRead {
+  threadId   String
+  userId     String
+  lastReadAt DateTime
+
+  thread Thread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([threadId, userId])
+}
+
+model Attachment {
+  id         String   @id @default(cuid())
+  uploaderId String
+  fileName   String
+  mimeType   String
+  sizeBytes  Int
+  storageKey String   @unique
+  createdAt  DateTime @default(now())
+
+  uploader User     @relation(fields: [uploaderId], references: [id])
+  message  Message?
+}
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  title     String
+  body      String
+  link      String?
+  dedupeKey String?   @unique
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt])
+}
+
+model Alert {
+  id           String        @id @default(cuid())
+  orgId        String
+  courseId     String?
+  sessionId    String?
+  type         String // TEACHER_MISSING, STUDENT_MISSING, NO_PARTICIPANTS, MESSAGE_FLAGGED, ISSUE_REPORTED, ...
+  severity     AlertSeverity
+  title        String
+  details      String?
+  status       AlertStatus   @default(OPEN)
+  dedupeKey    String        @unique
+  createdAt    DateTime      @default(now())
+  resolvedAt   DateTime?
+  resolvedById String?
+
+  org     Organization  @relation(fields: [orgId], references: [id])
+  course  Course?       @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  session ClassSession? @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, status, severity])
+}
+
+model AuditLog {
+  id         String      @id @default(cuid())
+  orgId      String
+  actorId    String?
+  action     String // e.g. CLASS_CREATED, USER_SUSPENDED, CLASS_JOINED
+  targetType String?
+  targetId   String?
+  result     AuditResult @default(SUCCESS)
+  metadata   Json?
+  ip         String?
+  userAgent  String?
+  createdAt  DateTime    @default(now())
+
+  org Organization @relation(fields: [orgId], references: [id])
+
+  @@index([orgId, createdAt])
+  @@index([targetType, targetId])
+}
+
+model AuthSession {
+  id        String   @id // sha256 of the session token; the raw token only lives in the cookie
+  userId    String
+  expiresAt DateTime
+  ip        String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
