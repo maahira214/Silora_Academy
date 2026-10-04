@@ -39,6 +39,10 @@ This option is hard-disabled in production builds.
 
 Checks: `npm test` (unit tests), `npm run typecheck`, `npm run lint`, `npm run build`.
 
+Backups: `npm run backup` saves a copy of the database to `./backups` (newest 14 kept), `npm run backup:list` lists them, and `npm run backup:restore` restores the newest one.
+This needs the PostgreSQL command-line tools (version 17 or newer). On Windows they are found automatically in `C:Program FilesPostgreSQL`.
+Chat files stay in `./storage`. Cloudflare R2 is used only in production (`STORAGE_DRIVER="r2"`).
+
 ## How it works
 
 | Area | Where |

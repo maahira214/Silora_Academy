@@ -10,8 +10,10 @@
 //   STORAGE_DRIVER="r2"    (production)            → Cloudflare R2 under backups/, old ones removed by an
 //                                                    R2 lifecycle rule (see deploy/README.md)
 // Needs pg_dump/pg_restore for Postgres 17. In production they are in the backup container
-// (deploy/backup/Dockerfile); locally, install the PostgreSQL 17 command-line tools or set PG_BIN.
+// (deploy/backup/Dockerfile); on Windows they are found automatically under C:Program FilesPostgreSQL
+// (version 17 or newer), or set PG_BIN to the folder that contains them.
 import { spawn } from "node:child_process";
+import { existsSync, readdirSync } from "node:fs";
 import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
@@ -76,14 +78,24 @@ export const backupKey = (at = new Date()) => `${PREFIX}silora-${at.toISOString(
 
 export const newestFirst = (keys) => keys.filter((k) => k.startsWith(PREFIX) && k.endsWith(".dump")).sort().reverse();
 
+/** Folder with pg_dump/pg_restore: PG_BIN, else the newest PostgreSQL (17+) install on Windows, else PATH. */
+export function pgBinDir(env = process.env, platform = process.platform, base = "C:/Program Files/PostgreSQL") {
+  if (env.PG_BIN) return env.PG_BIN;
+  if (platform !== "win32" || !existsSync(base)) return null;
+  const versions = readdirSync(base).map(Number).filter((v) => v >= 17).sort((a, b) => b - a);
+  const found = versions.map((v) => join(base, String(v), "bin")).find((dir) => existsSync(join(dir, "pg_dump.exe")));
+  return found ?? null;
+}
+
 function run(cmd, args) {
-  const bin = process.env.PG_BIN ? join(process.env.PG_BIN, cmd) : cmd;
+  const dir = pgBinDir();
+  const bin = dir ? join(dir, cmd) : cmd;
   return new Promise((resolve, reject) => {
     const p = spawn(bin, args, { stdio: ["ignore", "inherit", "inherit"] });
     p.on("error", (e) =>
       reject(
         e.code === "ENOENT"
-          ? new Error(`${cmd} not found. Install the PostgreSQL 17 command-line tools, or set PG_BIN to the folder that contains ${cmd}.`)
+          ? new Error(`${cmd} not found. Install the PostgreSQL command-line tools (version 17 or newer), or set PG_BIN to the folder that contains ${cmd}.`)
           : e,
       ),
     );

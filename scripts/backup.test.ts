@@ -1,8 +1,8 @@
-import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import { backup, backupKey, backupTime, localStore, newestFirst, nextRunAt, restore } from "../scripts/backup.mjs";
+import { backup, backupKey, backupTime, localStore, newestFirst, nextRunAt, pgBinDir, restore } from "../scripts/backup.mjs";
 
 const fakeStore = (files: Record<string, Buffer> = {}) => ({
   files,
@@ -94,5 +94,26 @@ describe("localStore (development backups)", () => {
 
   it.each(["backups/../../.env", "uploads/x.dump", "backups/a/b.dump"])("rejects unsafe key %j", async (key) => {
     await expect(localStore(tmpdir()).put(key, Buffer.from("x"))).rejects.toThrow(/Invalid backup key/);
+  });
+});
+
+describe("pgBinDir", () => {
+  it("prefers PG_BIN when set", () => {
+    expect(pgBinDir({ PG_BIN: "D:/pg/bin" } as unknown as NodeJS.ProcessEnv, "win32")).toBe("D:/pg/bin");
+  });
+  it("uses PATH outside Windows", () => {
+    expect(pgBinDir({} as unknown as NodeJS.ProcessEnv, "linux")).toBeNull();
+  });
+  it("picks the newest PostgreSQL 17+ install on Windows", async () => {
+    const base = await mkdtemp(join(tmpdir(), "pg-installs-"));
+    try {
+      for (const v of ["16", "17", "18"]) {
+        await mkdir(join(base, v, "bin"), { recursive: true });
+        await writeFile(join(base, v, "bin", "pg_dump.exe"), "");
+      }
+      expect(pgBinDir({} as unknown as NodeJS.ProcessEnv, "win32", base)).toBe(join(base, "18", "bin"));
+    } finally {
+      await rm(base, { recursive: true, force: true });
+    }
   });
 });
