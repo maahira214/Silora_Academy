@@ -44,6 +44,7 @@ next-env.d.ts
 # local dev database and uploaded files
 /.pgdata
 /storage
+/backups
 
 # Claude Code personal settings
 /.claude/settings.local.json

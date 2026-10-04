@@ -13,6 +13,7 @@ Tutoring operations platform for Silora Academy (siloraacademy.com): admin/opera
 - Branding: gold #E8B112, navy #0A2D4A, Montserrat.
 - Approved 2026-10-03: the build plan and simplicity rules; hosting on AWS Lightsail Mumbai 2 GB with Cloudflare R2 for files; app address `app.siloraacademy.com`; **English only** for v1.
 - **Hosting is connected last.** Build everything server-independent first; keep deployment portable (Docker Compose, all config in env, files and backups in R2, nothing stateful on the box except Postgres) so the Lightsail instance can be resized or replaced without architecture changes.
+- **Local-first until development is tested (2026-10-04):** files, database and backups all stay on this computer (`STORAGE_DRIVER="local"`, `./storage`, `./backups`). R2 and Lightsail are production-only; the user will not add a payment card or create R2/Google/Sentry accounts until local testing is done. Never make R2 required for local development.
 - The siloraacademy.com DNS is managed by the **website developer**, not the user; the single `app.` record is requested from them when hosting is connected.
 
 ## Build plan (user must confirm before each phase)

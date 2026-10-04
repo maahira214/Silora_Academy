@@ -1,6 +1,8 @@
-import { readFile, writeFile } from "node:fs/promises";
+import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import { backup, backupKey, newestFirst, nextRunAt, restore } from "../scripts/backup.mjs";
+import { backup, backupKey, backupTime, localStore, newestFirst, nextRunAt, restore } from "../scripts/backup.mjs";
 
 const fakeStore = (files: Record<string, Buffer> = {}) => ({
   files,
@@ -62,5 +64,35 @@ describe("nextRunAt", () => {
   it("rolls over to the next day after 21:30 UTC", () => {
     expect(nextRunAt(new Date("2026-10-03T21:30:00Z")).toISOString()).toBe("2026-10-04T21:30:00.000Z");
     expect(nextRunAt(new Date("2026-10-31T23:00:00Z")).toISOString()).toBe("2026-11-01T21:30:00.000Z");
+  });
+});
+
+describe("backupTime", () => {
+  it("reads the time back from a backup name", () => {
+    expect(backupTime("backups/silora-2026-10-03T2130Z.dump")?.toISOString()).toBe("2026-10-03T21:30:00.000Z");
+    expect(backupTime("backups/notes.txt")).toBeNull();
+  });
+});
+
+describe("localStore (development backups)", () => {
+  it("saves, lists and reads backups in a folder, keeping only the newest", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "silora-backups-"));
+    try {
+      const store = localStore(dir, 2);
+      for (const day of ["01", "02", "03"]) await store.put(`backups/silora-2026-10-${day}T2130Z.dump`, Buffer.from(day));
+      expect((await readdir(dir)).sort()).toEqual(["silora-2026-10-02T2130Z.dump", "silora-2026-10-03T2130Z.dump"]);
+      expect(newestFirst(await store.list())[0]).toBe("backups/silora-2026-10-03T2130Z.dump");
+      expect((await store.get("backups/silora-2026-10-03T2130Z.dump")).toString()).toBe("03");
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("lists nothing when the folder does not exist yet", async () => {
+    expect(await localStore(join(tmpdir(), "silora-missing-dir-xyz")).list()).toEqual([]);
+  });
+
+  it.each(["backups/../../.env", "uploads/x.dump", "backups/a/b.dump"])("rejects unsafe key %j", async (key) => {
+    await expect(localStore(tmpdir()).put(key, Buffer.from("x"))).rejects.toThrow(/Invalid backup key/);
   });
 });

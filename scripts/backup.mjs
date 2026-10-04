@@ -1,20 +1,46 @@
-// Database backups to Cloudflare R2.
+// Database backups.
 //
 //   node scripts/backup.mjs schedule            run forever: back up daily at 21:30 UTC (3 AM India time)
-//   node scripts/backup.mjs backup              dump the database and upload it to R2 now
-//   node scripts/backup.mjs list                list backups in R2, newest first
-//   node scripts/backup.mjs restore [key]       download a backup (default: newest) and restore it
+//   node scripts/backup.mjs backup              back up now
+//   node scripts/backup.mjs list                list backups, newest first
+//   node scripts/backup.mjs restore [key]       restore a backup (default: the newest)
 //
-// Runs inside the "backup" container (deploy/backup/Dockerfile), which has pg_dump/pg_restore
-// matching the Postgres server version. Needs DATABASE_URL and the R2_* settings.
-// Old backups are removed by an R2 lifecycle rule on the "backups/" prefix (see deploy/README.md).
+// Where backups go follows the same switch as chat files:
+//   STORAGE_DRIVER="local" (default, development)  → the BACKUP_DIR folder (default ./backups), newest 14 kept
+//   STORAGE_DRIVER="r2"    (production)            → Cloudflare R2 under backups/, old ones removed by an
+//                                                    R2 lifecycle rule (see deploy/README.md)
+// Needs pg_dump/pg_restore for Postgres 17. In production they are in the backup container
+// (deploy/backup/Dockerfile); locally, install the PostgreSQL 17 command-line tools or set PG_BIN.
 import { spawn } from "node:child_process";
-import { readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, join, resolve } from "node:path";
 import { AwsClient } from "aws4fetch";
 
 const PREFIX = "backups/";
+export const LOCAL_KEEP = 14;
+
+/** Local folder store for development: keys "backups/<file>" map to <dir>/<file>. */
+export function localStore(dir = process.env.BACKUP_DIR || "./backups", keep = LOCAL_KEEP) {
+  const root = resolve(dir);
+  const pathFor = (key) => {
+    if (!key.startsWith(PREFIX) || basename(key) !== key.slice(PREFIX.length)) throw new Error(`Invalid backup key: ${key}`);
+    return join(root, basename(key));
+  };
+  const list = async () => (await readdir(root).catch(() => [])).map((f) => PREFIX + f);
+  return {
+    async put(key, data) {
+      await mkdir(root, { recursive: true });
+      await writeFile(pathFor(key), data);
+      // No lifecycle rules on a laptop: keep the newest few and delete the rest.
+      for (const old of newestFirst(await list()).slice(keep)) await rm(pathFor(old), { force: true });
+    },
+    get: (key) => readFile(pathFor(key)),
+    list,
+  };
+}
+
+export const defaultStore = (env = process.env) => (env.STORAGE_DRIVER === "r2" ? r2(env) : localStore(env.BACKUP_DIR));
 
 export function r2(env = process.env) {
   const { R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET } = env;
@@ -51,9 +77,16 @@ export const backupKey = (at = new Date()) => `${PREFIX}silora-${at.toISOString(
 export const newestFirst = (keys) => keys.filter((k) => k.startsWith(PREFIX) && k.endsWith(".dump")).sort().reverse();
 
 function run(cmd, args) {
+  const bin = process.env.PG_BIN ? join(process.env.PG_BIN, cmd) : cmd;
   return new Promise((resolve, reject) => {
-    const p = spawn(cmd, args, { stdio: ["ignore", "inherit", "inherit"] });
-    p.on("error", reject);
+    const p = spawn(bin, args, { stdio: ["ignore", "inherit", "inherit"] });
+    p.on("error", (e) =>
+      reject(
+        e.code === "ENOENT"
+          ? new Error(`${cmd} not found. Install the PostgreSQL 17 command-line tools, or set PG_BIN to the folder that contains ${cmd}.`)
+          : e,
+      ),
+    );
     p.on("exit", (code) => (code === 0 ? resolve() : reject(new Error(`${cmd} exited with code ${code}`))));
   });
 }
@@ -65,7 +98,7 @@ const libpqUrl = (url) => {
   return u.toString();
 };
 
-export async function backup({ store = r2(), dbUrl = process.env.DATABASE_URL, exec = run, now = new Date() } = {}) {
+export async function backup({ store = defaultStore(), dbUrl = process.env.DATABASE_URL, exec = run, now = new Date() } = {}) {
   if (!dbUrl) throw new Error("DATABASE_URL is not set");
   const file = join(tmpdir(), `silora-backup-${process.pid}.dump`);
   try {
@@ -75,17 +108,17 @@ export async function backup({ store = r2(), dbUrl = process.env.DATABASE_URL, e
     if (data.length === 0) throw new Error("pg_dump produced an empty file");
     const key = backupKey(now);
     await store.put(key, data);
-    console.log(`${new Date().toISOString()} backup uploaded: ${key} (${(data.length / 1024).toFixed(0)} KB)`);
+    console.log(`${new Date().toISOString()} backup saved: ${key} (${(data.length / 1024).toFixed(0)} KB)`);
     return key;
   } finally {
     await rm(file, { force: true });
   }
 }
 
-export async function restore(key, { store = r2(), dbUrl = process.env.DATABASE_URL, exec = run } = {}) {
+export async function restore(key, { store = defaultStore(), dbUrl = process.env.DATABASE_URL, exec = run } = {}) {
   if (!dbUrl) throw new Error("DATABASE_URL is not set");
   const chosen = key ?? newestFirst(await store.list(PREFIX))[0];
-  if (!chosen) throw new Error("No backups found in R2");
+  if (!chosen) throw new Error("No backups found");
   const file = join(tmpdir(), `silora-restore-${process.pid}.dump`);
   try {
     await writeFile(file, await store.get(chosen));
@@ -106,13 +139,13 @@ export function nextRunAt(now = new Date()) {
   return next;
 }
 
-const backupTime = (key) => {
-  const m = key.match(/silora-(d{4}-d{2}-d{2})T(d{2})(d{2})Z.dump$/);
+export const backupTime = (key) => {
+  const m = key.match(/silora-(\d{4}-\d{2}-\d{2})T(\d{2})(\d{2})Z\.dump$/);
   return m ? new Date(`${m[1]}T${m[2]}:${m[3]}:00Z`) : null;
 };
 
 async function schedule() {
-  const store = r2();
+  const store = defaultStore();
   const tryBackup = () => backup({ store }).catch((e) => console.error(`${new Date().toISOString()} backup FAILED: ${e.message}`));
   // On a fresh or restarted server, take a backup straight away if the newest one is over a day old.
   const newest = newestFirst(await store.list(PREFIX).catch(() => []))[0];
@@ -132,7 +165,7 @@ if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith
     schedule,
     backup: () => backup(),
     restore: () => restore(arg),
-    list: async () => newestFirst(await r2().list(PREFIX)).forEach((k) => console.log(k)),
+    list: async () => newestFirst(await defaultStore().list(PREFIX)).forEach((k) => console.log(k)),
   };
   if (!actions[cmd]) {
     console.error("Usage: node scripts/backup.mjs schedule | backup | list | restore [key]");

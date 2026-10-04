@@ -12,7 +12,10 @@
     "db": "node scripts/dev-db.mjs",
     "db:deploy": "prisma migrate deploy",
     "db:seed": "tsx prisma/seed.ts",
-    "worker": "node scripts/worker.mjs"
+    "worker": "node scripts/worker.mjs",
+    "backup": "node --env-file-if-exists=.env scripts/backup.mjs backup",
+    "backup:list": "node --env-file-if-exists=.env scripts/backup.mjs list",
+    "backup:restore": "node --env-file-if-exists=.env scripts/backup.mjs restore"
   },
   "dependencies": {
     "@date-fns/tz": "^1.5.0",
