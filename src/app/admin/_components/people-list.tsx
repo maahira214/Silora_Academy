@@ -3,7 +3,7 @@ import type { Prisma, UserStatus } from "@prisma/client";
 import { db } from "@/lib/db";
 import type { CurrentUser } from "@/lib/auth/session";
 import { fmtDate } from "@/lib/time";
-import { Avatar, Badge, ButtonLink, Card, EmptyState, PageHeader, Table, Td, Th } from "@/components/ui";
+import { Avatar, Badge, ButtonLink, Card, EmptyState, PageHeader, Table, Td, Th, cx } from "@/components/ui";
 import { Input, Select } from "@/components/forms";
 
 export const STATUS_TONE: Record<UserStatus, "success" | "warning" | "neutral"> = {
@@ -12,6 +12,9 @@ export const STATUS_TONE: Record<UserStatus, "success" | "warning" | "neutral"> 
   DEACTIVATED: "neutral",
 };
 
+export type PeopleRole = "TEACHER" | "STUDENT";
+
+/** Teachers and students on one page, with a role filter. */
 export async function PeopleList({
   user,
   role,
@@ -19,13 +22,13 @@ export async function PeopleList({
   status,
 }: {
   user: CurrentUser;
-  role: "TEACHER" | "STUDENT";
+  role?: PeopleRole;
   q?: string;
   status?: UserStatus;
 }) {
   const where: Prisma.UserWhereInput = {
     orgId: user.orgId,
-    role,
+    role: role ?? { in: ["TEACHER", "STUDENT"] },
     status: status ?? { not: "DEACTIVATED" },
     OR: q ? [{ name: { contains: q, mode: "insensitive" } }, { email: { contains: q, mode: "insensitive" } }] : undefined,
   };
@@ -44,36 +47,71 @@ export async function PeopleList({
     orderBy: { name: "asc" },
     take: 500,
   });
-  const base = role === "TEACHER" ? "/admin/teachers" : "/admin/students";
-  const noun = role === "TEACHER" ? "teacher" : "student";
   const tz = user.timezone ?? user.org.timezone;
+  const detailHref = (p: { id: string; role: string }) => `/admin/${p.role === "TEACHER" ? "teachers" : "students"}/${p.id}`;
+  const filterHref = (r?: PeopleRole) => {
+    const sp = new URLSearchParams();
+    if (r) sp.set("role", r === "TEACHER" ? "teachers" : "students");
+    if (q) sp.set("q", q);
+    if (status) sp.set("status", status);
+    const qs = sp.toString();
+    return `/admin/people${qs ? `?${qs}` : ""}`;
+  };
+  const tabs: [string, PeopleRole | undefined][] = [
+    ["Everyone", undefined],
+    ["Teachers", "TEACHER"],
+    ["Students", "STUDENT"],
+  ];
+  const count =
+    people.length === 1 ? "1 person" : `${people.length} ${role === "TEACHER" ? "teachers" : role === "STUDENT" ? "students" : "people"}`;
 
   return (
     <>
       <PageHeader
-        title={role === "TEACHER" ? "Teachers" : "Students"}
-        subtitle={`${people.length} ${noun}${people.length === 1 ? "" : "s"}`}
-        actions={<ButtonLink href={`${base}/new`}>+ Add {noun}</ButtonLink>}
+        title="People"
+        subtitle={count}
+        actions={
+          <>
+            <ButtonLink href="/admin/teachers/new" variant="secondary">
+              + Add teacher
+            </ButtonLink>
+            <ButtonLink href="/admin/students/new">+ Add student</ButtonLink>
+          </>
+        }
       />
+      <div className="mb-4 flex w-fit gap-1 rounded-full bg-white p-1 ring-1 ring-slate-200">
+        {tabs.map(([label, r]) => (
+          <Link
+            key={label}
+            href={filterHref(r)}
+            aria-current={role === r ? "page" : undefined}
+            className={cx("rounded-full px-4 py-1.5 text-sm font-bold", role === r ? "bg-navy-800 text-white" : "text-slate-600 hover:bg-slate-100")}
+          >
+            {label}
+          </Link>
+        ))}
+      </div>
       <form className="mb-4 flex flex-wrap gap-2">
-        <Input name="q" defaultValue={q} placeholder={`Search ${noun}s by name or email`} className="max-w-xs" />
+        {role && <input type="hidden" name="role" value={role === "TEACHER" ? "teachers" : "students"} />}
+        <Input name="q" defaultValue={q} placeholder="Search by name or email" className="max-w-xs" />
         <Select name="status" defaultValue={status ?? ""} className="max-w-[180px]">
           <option value="">Active & suspended</option>
           <option value="ACTIVE">Active</option>
           <option value="SUSPENDED">Suspended</option>
           <option value="DEACTIVATED">Deactivated</option>
         </Select>
-        <button className="rounded-full bg-navy-800 px-4 text-sm font-semibold text-white">Filter</button>
+        <button className="rounded-full bg-navy-800 px-4 text-sm font-semibold text-white">Search</button>
       </form>
       <Card>
         {people.length === 0 ? (
-          <EmptyState title={`No ${noun}s found`} />
+          <EmptyState title="Nobody found" body={q ? "Try a different name or email." : undefined} />
         ) : (
           <Table>
             <thead>
               <tr>
                 <Th>Name</Th>
-                <Th>{role === "TEACHER" ? "Title" : "Grade / board"}</Th>
+                <Th>Role</Th>
+                <Th>Details</Th>
                 <Th>Active classes</Th>
                 <Th>Status</Th>
                 <Th>Last sign-in</Th>
@@ -83,7 +121,7 @@ export async function PeopleList({
               {people.map((p) => (
                 <tr key={p.id} className="hover:bg-slate-50/60">
                   <Td>
-                    <Link href={`${base}/${p.id}`} className="flex items-center gap-3">
+                    <Link href={detailHref(p)} className="flex items-center gap-3">
                       <Avatar name={p.name} size="sm" />
                       <span>
                         <span className="block font-semibold text-navy-900 hover:underline">{p.name}</span>
@@ -91,12 +129,13 @@ export async function PeopleList({
                       </span>
                     </Link>
                   </Td>
+                  <Td>{p.role === "TEACHER" ? "Teacher" : "Student"}</Td>
                   <Td>
-                    {role === "TEACHER"
+                    {p.role === "TEACHER"
                       ? p.teacherProfile?.headline ?? "—"
                       : [p.studentProfile?.grade, p.studentProfile?.board].filter(Boolean).join(" · ") || "—"}
                   </Td>
-                  <Td className="tabular-nums">{role === "TEACHER" ? p._count.teaching : p._count.enrollments}</Td>
+                  <Td className="tabular-nums">{p.role === "TEACHER" ? p._count.teaching : p._count.enrollments}</Td>
                   <Td>
                     <Badge tone={STATUS_TONE[p.status]}>{p.status.toLowerCase()}</Badge>
                   </Td>

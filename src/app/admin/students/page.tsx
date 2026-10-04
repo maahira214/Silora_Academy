@@ -1,13 +1,6 @@
-import type { Metadata } from "next";
-import type { UserStatus } from "@prisma/client";
-import { requirePagePermission } from "@/lib/authz";
-import { PeopleList } from "../_components/people-list";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = { title: "Students" };
-
-export default async function Page({ searchParams }: PageProps<"/admin/students">) {
-  const user = await requirePagePermission("people.view");
-  const sp = await searchParams;
-  const status = ["ACTIVE", "SUSPENDED", "DEACTIVATED"].includes(String(sp.status)) ? (sp.status as UserStatus) : undefined;
-  return <PeopleList user={user} role="STUDENT" q={typeof sp.q === "string" ? sp.q : undefined} status={status} />;
+// Teachers and students share one page now.
+export default function Page() {
+  redirect("/admin/people?role=students");
 }

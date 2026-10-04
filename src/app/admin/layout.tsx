@@ -16,14 +16,14 @@ export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
     { href: "/admin", label: "Dashboard", icon: "home", exact: true },
     { href: "/admin/sessions", label: "Schedule", icon: "calendar" },
     { href: "/admin/classes", label: "Classes", icon: "book" },
-    { href: "/admin/teachers", label: "Teachers", icon: "teacher" },
-    { href: "/admin/students", label: "Students", icon: "students" },
+    { href: "/admin/people", label: "People", icon: "people" },
     { href: "/admin/alerts", label: "Alerts", icon: "alert", badge: openAlerts },
   ];
   if (can(user, "chat.review")) nav.push({ href: "/admin/moderation", label: "Chat review", icon: "shield", badge: flagged });
-  if (can(user, "staff.manage")) nav.push({ href: "/admin/staff", label: "Staff", icon: "staff" });
-  if (can(user, "audit.view")) nav.push({ href: "/admin/audit", label: "Audit log", icon: "log" });
-  if (can(user, "settings.manage")) nav.push({ href: "/admin/settings", label: "Settings", icon: "settings" });
+  // Rarely used pages sit under "More"
+  if (can(user, "staff.manage")) nav.push({ href: "/admin/staff", label: "Staff", icon: "staff", more: true });
+  if (can(user, "audit.view")) nav.push({ href: "/admin/audit", label: "Audit log", icon: "log", more: true });
+  if (can(user, "settings.manage")) nav.push({ href: "/admin/settings", label: "Settings", icon: "settings", more: true });
 
   return (
     <AppShell

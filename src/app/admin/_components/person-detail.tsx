@@ -29,13 +29,12 @@ export async function PersonDetail({ user, id, role }: { user: CurrentUser; id: 
   });
 
   const tz = user.timezone ?? user.org.timezone;
-  const base = role === "TEACHER" ? "/admin/teachers" : "/admin/students";
   const canSuspend = can(user, "people.suspend");
 
   return (
     <>
       <PageHeader
-        back={{ href: base, label: role === "TEACHER" ? "Teachers" : "Students" }}
+        back={{ href: `/admin/people?role=${role === "TEACHER" ? "teachers" : "students"}`, label: "People" }}
         title={person.name}
         subtitle={
           <span className="flex flex-wrap items-center gap-2">

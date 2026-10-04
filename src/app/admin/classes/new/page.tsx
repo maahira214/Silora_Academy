@@ -22,7 +22,7 @@ export default async function NewClassPage() {
   return (
     <>
       <PageHeader back={{ href: "/admin/classes", label: "Classes" }} title="New class" />
-      <div className="max-w-4xl">
+      <div className="max-w-3xl">
         <CourseForm
           action={createCourseAction}
           defaultTz={tz}

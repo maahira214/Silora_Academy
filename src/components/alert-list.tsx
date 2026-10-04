@@ -7,6 +7,9 @@ import { Badge, EmptyState, cx } from "@/components/ui";
 
 const SEVERITY_TONE = { CRITICAL: "danger", WARNING: "warning", INFO: "info" } as const;
 
+/** Help requests are keyed help:<userId>:<time> (see requestHelpAction). */
+const helpRequester = (dedupeKey: string) => dedupeKey.match(/^help:([^:]+):/)?.[1];
+
 export function AlertList({ alerts, timeZone, compact }: { alerts: Alert[]; timeZone: string; compact?: boolean }) {
   if (!alerts.length) return <EmptyState title="No open alerts" body="Everything is running normally." />;
   return (
@@ -29,6 +32,11 @@ export function AlertList({ alerts, timeZone, compact }: { alerts: Alert[]; time
             {!a.sessionId && a.courseId && (
               <Link href={`/admin/classes/${a.courseId}`} className="text-xs font-semibold text-gold-700 hover:underline">
                 Open class
+              </Link>
+            )}
+            {a.type === "HELP_REQUESTED" && helpRequester(a.dedupeKey) && (
+              <Link href={`/admin/people/${helpRequester(a.dedupeKey)}`} className="text-xs font-semibold text-gold-700 hover:underline">
+                Open their profile (phone number)
               </Link>
             )}
             {a.type === "MESSAGE_FLAGGED" && (

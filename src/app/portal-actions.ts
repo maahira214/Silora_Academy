@@ -90,7 +90,7 @@ export async function requestHelpAction(_: ActionResult, fd: FormData): Promise<
     const staff = await db.user.findMany({ where: { orgId: user.orgId, role: { in: ["SUPER_ADMIN", "OPERATIONS"] }, status: "ACTIVE" }, select: { id: true } });
     await notify(
       staff.map((s) => s.id),
-      { title: `${who} ${user.name} asked for help`, body: note.slice(0, 140), link: `/admin/${user.role === "TEACHER" ? "teachers" : "students"}/${user.id}` },
+      { title: `${who} ${user.name} asked for help`, body: note.slice(0, 140), link: `/admin/people/${user.id}` },
     );
     await audit({ orgId: user.orgId, actorId: user.id, action: "HELP_REQUESTED", targetType: "User", targetId: user.id });
     revalidatePath("/admin", "layout");
