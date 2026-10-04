@@ -18,6 +18,10 @@ const PATHS = {
   paperclip: "M21 11.5 12.5 20a5 5 0 0 1-7-7L14 4.5a3.5 3.5 0 0 1 5 5L10.5 18a2 2 0 0 1-3-3l7.5-7.5",
   send: "M4 12 20 4l-6 16-3-7z",
   x: "M6 6l12 12M18 6 6 18",
+  help: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zm-2.5-11.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6m0 3.5h.01",
+  more: "M5 12h.01M12 12h.01M19 12h.01",
+  chevronDown: "m6 9 6 6 6-6",
+  people: "M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zm-6 9a6 6 0 0 1 12 0m1-9a3 3 0 1 0 0-6m2 15h3a5 5 0 0 0-4-4.9",
 } as const;
 
 export type IconName = keyof typeof PATHS;

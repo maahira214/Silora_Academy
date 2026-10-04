@@ -1,9 +1,6 @@
-import type { Metadata } from "next";
-import { requirePageUser } from "@/lib/authz";
-import { PortalFiles } from "@/components/portal/pages";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = { title: "Files" };
-
-export default async function Page() {
-  return <PortalFiles user={await requirePageUser("STUDENT")} />;
+// Files now live inside each conversation (Messages → a chat → Files).
+export default function Page() {
+  redirect("/student/messages");
 }

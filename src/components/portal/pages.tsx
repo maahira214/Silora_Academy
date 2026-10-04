@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import type { CurrentUser } from "@/lib/auth/session";
 import { getCourseAccess, visibleCourseIds } from "@/lib/authz";
+import { pastLessonLabel } from "@/lib/lesson-phase";
 import { describeRule } from "@/lib/schedule";
 import { addDaysToKey, fmtDate, fmtDateTime, localDateKey, localDayRange, tzLabel } from "@/lib/time";
 import { displayIdentity, getThreadAccess, listMessages, markThreadRead, threadsForUser, threadTitle } from "@/server/chat";
@@ -12,15 +13,15 @@ import { AutoRefresh } from "@/components/auto-refresh";
 import { ChatWindow } from "@/components/chat-window";
 import { ActionForm, Input, SubmitButton } from "@/components/forms";
 import { Icon } from "@/components/icons";
-import { LessonCard } from "@/components/portal/lesson-card";
-import { Avatar, Badge, ButtonLink, Card, CardHeader, EmptyState, Notice, PageHeader, StatTile, buttonClass } from "@/components/ui";
+import { LessonCard, NextClassCard } from "@/components/portal/lesson-card";
+import { Avatar, Badge, ButtonLink, Card, CardHeader, EmptyState, Notice, PageHeader, buttonClass, cx } from "@/components/ui";
 
 type Role = "TEACHER" | "STUDENT";
 const baseOf = (role: Role) => (role === "TEACHER" ? "/teacher" : "/student") as "/teacher" | "/student";
 const tzOf = (u: CurrentUser) => u.timezone ?? u.org.timezone;
 const firstName = (n: string) => n.split(" ")[0];
 
-/* ---------- Today ---------- */
+/* ---------- Home ---------- */
 
 export async function PortalHome({ user }: { user: CurrentUser }) {
   const role = user.role as Role;
@@ -28,107 +29,103 @@ export async function PortalHome({ user }: { user: CurrentUser }) {
   const tz = tzOf(user);
   const now = new Date();
   const todayKey = localDateKey(now, tz);
-  const [dayStart, dayEnd] = localDayRange(todayKey, tz);
-  const [, weekEnd] = localDayRange(addDaysToKey(todayKey, 7), tz);
+  const [, dayEnd] = localDayRange(todayKey, tz);
+  const [, horizon] = localDayRange(addDaysToKey(todayKey, 14), tz);
   const courseIds = (await visibleCourseIds(user)) ?? [];
   const courseFilter = { courseId: { in: courseIds }, course: { status: "ACTIVE" as const } };
 
-  const [today, upcoming, threads, newFiles] = await Promise.all([
-    loadSessions({ ...courseFilter, startsAt: { gte: dayStart, lt: dayEnd } }, user.org),
-    loadSessions({ ...courseFilter, startsAt: { gte: dayEnd, lt: weekEnd }, status: "SCHEDULED" }, user.org, { take: 6 }),
+  const [lessons, threads, courseThreads] = await Promise.all([
+    // Everything from now on: today's remaining lessons and the next two weeks
+    loadSessions({ ...courseFilter, endsAt: { gt: now }, startsAt: { lt: horizon }, status: { in: ["SCHEDULED", "CANCELLED"] } }, user.org, { take: 40 }),
     threadsForUser(user),
-    db.message.count({
-      where: {
-        attachmentId: { not: null },
-        status: "VISIBLE",
-        senderId: { not: user.id },
-        createdAt: { gte: new Date(now.getTime() - 7 * 86_400_000) },
-        thread: { courseId: { in: courseIds } },
-      },
-    }),
+    db.thread.findMany({ where: { courseId: { in: courseIds }, kind: "COURSE", status: { not: "DISABLED" } }, select: { id: true, courseId: true } }),
   ]);
+  const threadOf = new Map(courseThreads.map((t) => [t.courseId, t.id]));
+  const messageHref = (courseId: string) => (threadOf.has(courseId) ? `${base}/messages/${threadOf.get(courseId)}` : undefined);
+
+  const next = lessons.find((s) => s.status === "SCHEDULED");
+  const laterToday = lessons.filter((s) => s !== next && s.startsAt < dayEnd);
+  const comingUp = lessons.filter((s) => s !== next && s.startsAt >= dayEnd && s.status === "SCHEDULED").slice(0, 4);
   const unread = threads.reduce((n, t) => n + t.unread, 0);
-  const remaining = today.filter((s) => s.endsAt > now && s.status !== "CANCELLED");
   const hour = Number(new Intl.DateTimeFormat("en-GB", { hour: "numeric", hourCycle: "h23", timeZone: tz }).format(now));
   const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
 
   return (
-    <>
+    <div className="mx-auto max-w-2xl">
       <AutoRefresh seconds={30} />
-      <PageHeader title={`${greeting}, ${firstName(user.name)}`} subtitle={`${fmtDate(now, tz)} · times shown in ${tzLabel(now, tz)}`} />
+      <PageHeader title={`${greeting}, ${firstName(user.name)}`} subtitle={`${fmtDate(now, tz)} · times in ${tzLabel(now, tz)}`} />
 
-      <div className="grid grid-cols-3 gap-3">
-        <StatTile label="Classes left today" value={remaining.length} />
-        <StatTile label="Unread messages" value={unread} tone={unread ? "warning" : undefined} href={`${base}/messages`} />
-        <StatTile label={role === "STUDENT" ? "New files (7 days)" : "Files received (7 days)"} value={newFiles} href={`${base}/files`} />
-      </div>
+      {unread > 0 && (
+        <Link
+          href={`${base}/messages`}
+          className="mb-5 flex items-center gap-3 rounded-2xl bg-gold-50 px-5 py-4 font-semibold text-navy-900 ring-1 ring-gold-300 hover:bg-gold-100"
+        >
+          <Icon name="chat" className="size-6 text-gold-700" />
+          <span className="flex-1">
+            You have {unread} new {unread === 1 ? "message" : "messages"}
+          </span>
+          <span className="text-sm text-gold-800">Open →</span>
+        </Link>
+      )}
 
-      <section className="mt-8">
-        <h2 className="mb-3 text-lg font-bold text-navy-900">Today</h2>
-        {today.length === 0 ? (
-          <Card>
-            <EmptyState title="No classes today" body="Enjoy your day! Upcoming classes are listed below." />
-          </Card>
-        ) : (
+      {next ? (
+        <NextClassCard
+          s={next}
+          viewer={role}
+          timeZone={tz}
+          joinOpensMinutesBefore={user.org.joinOpensMinutesBefore}
+          base={base}
+          messageHref={messageHref(next.courseId)}
+          today={next.startsAt < dayEnd}
+        />
+      ) : (
+        <Card>
+          <EmptyState title="No classes coming up" body="When Silora Academy schedules your next class, it will appear here." />
+        </Card>
+      )}
+
+      {laterToday.length > 0 && (
+        <section className="mt-8">
+          <h2 className="mb-3 text-lg font-bold text-navy-900">Later today</h2>
           <div className="space-y-3">
-            {today.map((s) => (
-              <LessonCard key={s.id} s={s} viewer={role} timeZone={tz} joinOpensMinutesBefore={user.org.joinOpensMinutesBefore} base={base} />
+            {laterToday.map((s) => (
+              <LessonCard
+                key={s.id}
+                s={s}
+                viewer={role}
+                timeZone={tz}
+                joinOpensMinutesBefore={user.org.joinOpensMinutesBefore}
+                base={base}
+                messageHref={role === "TEACHER" ? messageHref(s.courseId) : undefined}
+              />
             ))}
           </div>
-        )}
-      </section>
+        </section>
+      )}
 
-      <div className="mt-8 grid gap-6 lg:grid-cols-2">
-        <Card>
-          <CardHeader title="Coming up this week" />
-          {upcoming.length === 0 ? (
-            <EmptyState title="Nothing scheduled this week" />
-          ) : (
+      {comingUp.length > 0 && (
+        <section className="mt-8">
+          <h2 className="mb-3 text-lg font-bold text-navy-900">Coming up</h2>
+          <Card>
             <ul className="divide-y divide-slate-100">
-              {upcoming.map((s) => (
-                <li key={s.id} className="flex items-center justify-between gap-3 px-5 py-3">
-                  <div>
-                    <p className="font-semibold text-navy-900">{s.course.subject.name}</p>
-                    <p className="text-xs text-slate-500">
-                      {role === "TEACHER" ? s.course.students.map((x) => x.student.name).join(", ") : s.course.teacher.name}
-                    </p>
-                  </div>
-                  <span className="text-right text-sm font-semibold text-slate-700">{fmtDateTime(s.startsAt, tz)}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Card>
-        <Card>
-          <CardHeader
-            title="Messages"
-            action={
-              <Link href={`${base}/messages`} className="text-xs font-semibold text-gold-700 hover:underline">
-                Open messages
-              </Link>
-            }
-          />
-          {threads.length === 0 ? (
-            <EmptyState title="No conversations yet" />
-          ) : (
-            <ul className="divide-y divide-slate-100">
-              {threads.slice(0, 5).map((t) => (
-                <li key={t.id}>
-                  <Link href={`${base}/messages/${t.id}`} className="flex items-center gap-3 px-5 py-3 hover:bg-slate-50">
-                    <Avatar name={t.title} size="sm" />
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-semibold text-navy-900">{t.title}</span>
-                      <span className="block truncate text-xs text-slate-500">{t.lastMessage?.body || (t.lastMessage ? "📎 File" : "No messages yet")}</span>
+              {comingUp.map((s) => (
+                <li key={s.id}>
+                  <Link href={`${base}/classes/${s.courseId}`} className="flex items-center justify-between gap-3 px-5 py-4 hover:bg-slate-50">
+                    <span className="min-w-0">
+                      <span className="block font-semibold text-navy-900">{s.course.subject.name}</span>
+                      <span className="block truncate text-sm text-slate-500">
+                        {role === "TEACHER" ? s.course.students.map((x) => x.student.name).join(", ") : s.course.teacher.name}
+                      </span>
                     </span>
-                    {t.unread > 0 && <span className="rounded-full bg-gold-500 px-2 py-0.5 text-[11px] font-bold text-navy-900">{t.unread}</span>}
+                    <span className="shrink-0 text-right text-sm font-semibold text-slate-700">{fmtDateTime(s.startsAt, tz)}</span>
                   </Link>
                 </li>
               ))}
             </ul>
-          )}
-        </Card>
-      </div>
-    </>
+          </Card>
+        </section>
+      )}
+    </div>
   );
 }
 
@@ -237,7 +234,7 @@ export async function PortalClassDetail({ user, id }: { user: CurrentUser; id: s
       <div className="grid gap-6 xl:grid-cols-3">
         <div className="space-y-6 xl:col-span-2">
           <section>
-            <h2 className="mb-3 text-lg font-bold text-navy-900">Upcoming lessons</h2>
+            <h2 className="mb-3 text-lg font-bold text-navy-900">Next lessons</h2>
             {upcoming.length === 0 ? (
               <Card>
                 <EmptyState title="No upcoming lessons" />
@@ -260,9 +257,7 @@ export async function PortalClassDetail({ user, id }: { user: CurrentUser; id: s
                 {recent.map((s) => (
                   <li key={s.id} className="flex items-center justify-between gap-3 px-5 py-3 text-sm">
                     <span className="font-semibold text-slate-800">{fmtDateTime(s.startsAt, tz)}</span>
-                    <Badge tone={s.status === "COMPLETED" ? "success" : s.status === "CANCELLED" ? "neutral" : "warning"}>
-                      {s.status.replaceAll("_", " ").toLowerCase()}
-                    </Badge>
+                    <Badge tone={pastLessonLabel(s.status, role).tone}>{pastLessonLabel(s.status, role).label}</Badge>
                   </li>
                 ))}
               </ul>
@@ -367,17 +362,29 @@ export async function PortalMessages({ user }: { user: CurrentUser }) {
   );
 }
 
-export async function PortalThread({ user, id }: { user: CurrentUser; id: string }) {
+export async function PortalThread({ user, id, tab }: { user: CurrentUser; id: string; tab?: string }) {
   const base = baseOf(user.role as Role);
+  const tz = tzOf(user);
   const access = await getThreadAccess(user, id);
   if (!access || access.as === "reviewer") notFound();
-  const messages = await listMessages(user, access);
-  await markThreadRead(user, id);
+  const showFiles = tab === "files";
+  const [messages, files] = await Promise.all([
+    showFiles ? Promise.resolve([]) : listMessages(user, access),
+    db.message.findMany({
+      where: { threadId: id, attachmentId: { not: null }, OR: [{ status: "VISIBLE" }, { senderId: user.id, status: { not: "REMOVED" } }] },
+      include: { attachment: true, sender: { select: { name: true } } },
+      orderBy: { createdAt: "desc" },
+      take: 200,
+    }),
+  ]);
+  if (!showFiles) await markThreadRead(user, id);
   const { course } = access.thread;
   const people =
     access.thread.kind === "PRIVATE"
       ? [course.teacher.name, course.students.find((s) => s.studentId === access.thread.studentId)?.student.name].filter(Boolean)
       : [course.teacher.name, ...course.students.map((s) => s.student.name)];
+  const tabClass = (on: boolean) =>
+    cx("flex-1 rounded-full px-4 py-2 text-center text-sm font-bold", on ? "bg-navy-800 text-white" : "text-slate-600 hover:bg-slate-100");
 
   return (
     <>
@@ -385,76 +392,50 @@ export async function PortalThread({ user, id }: { user: CurrentUser; id: string
         back={{ href: `${base}/messages`, label: "Messages" }}
         title={threadTitle(access.thread, user.role)}
         subtitle={`${course.subject.name} · ${people.join(", ")}`}
-        actions={
-          <Link href={`${base}/classes/${course.id}`} className={buttonClass("secondary", "sm")}>
-            Class details
-          </Link>
-        }
       />
+      <div className="mb-3 flex max-w-xs gap-1 rounded-full bg-white p-1 ring-1 ring-slate-200">
+        <Link href={`${base}/messages/${id}`} className={tabClass(!showFiles)} aria-current={!showFiles ? "page" : undefined}>
+          Chat
+        </Link>
+        <Link href={`${base}/messages/${id}?tab=files`} className={tabClass(showFiles)} aria-current={showFiles ? "page" : undefined}>
+          Files{files.length ? ` (${files.length})` : ""}
+        </Link>
+      </div>
       <Card className="overflow-hidden">
-        <ChatWindow
-          threadId={id}
-          initialMessages={messages}
-          initialCanPost={access.canPost}
-          initialReadOnlyReason={access.readOnlyReason}
-          send={sendMessageAction.bind(null, id)}
-          maxUploadMb={user.org.maxUploadMb}
-        />
-      </Card>
-    </>
-  );
-}
-
-/* ---------- Files ---------- */
-
-export async function PortalFiles({ user }: { user: CurrentUser }) {
-  const base = baseOf(user.role as Role);
-  const tz = tzOf(user);
-  const courseIds = (await visibleCourseIds(user)) ?? [];
-  const messages = await db.message.findMany({
-    where: {
-      attachmentId: { not: null },
-      status: "VISIBLE",
-      thread: {
-        courseId: { in: courseIds },
-        status: { not: "DISABLED" },
-        ...(user.role === "STUDENT" ? { OR: [{ kind: "COURSE" as const }, { studentId: user.id }] } : {}),
-      },
-    },
-    include: { attachment: true, sender: { select: { name: true, role: true } }, thread: { include: { course: { include: { subject: true } } } } },
-    orderBy: { createdAt: "desc" },
-    take: 200,
-  });
-  return (
-    <>
-      <PageHeader title="Files" subtitle="Worksheets, images and documents shared in your conversations." />
-      <Card>
-        {messages.length === 0 ? (
-          <EmptyState title="No files yet" />
-        ) : (
-          <ul className="divide-y divide-slate-100">
-            {messages.map((m) => (
-              <li key={m.id} className="flex items-center gap-3 px-5 py-3">
-                <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-gold-50 text-gold-700">
-                  <Icon name="file" />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <a href={`/api/files/${m.attachment!.id}`} target="_blank" rel="noreferrer" className="block truncate font-semibold text-navy-900 hover:underline">
-                    {m.attachment!.fileName}
-                  </a>
-                  <span className="block text-xs text-slate-500">
-                    {m.sender.name} · {m.thread.course.subject.name} · {fmtDateTime(m.createdAt, tz)}
+        {showFiles ? (
+          files.length === 0 ? (
+            <EmptyState title="No files yet" body="Photos, worksheets and documents sent in this chat will appear here." />
+          ) : (
+            <ul className="divide-y divide-slate-100">
+              {files.map((m) => (
+                <li key={m.id} className="flex items-center gap-3 px-4 py-3 sm:px-5">
+                  <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-gold-50 text-gold-700">
+                    <Icon name="file" />
                   </span>
-                </span>
-                <Link href={`${base}/messages/${m.threadId}`} className="hidden text-xs font-semibold text-gold-700 hover:underline sm:block">
-                  Open chat
-                </Link>
-                <a href={`/api/files/${m.attachment!.id}?download=1`} className={buttonClass("secondary", "sm")}>
-                  Download
-                </a>
-              </li>
-            ))}
-          </ul>
+                  <span className="min-w-0 flex-1">
+                    <a href={`/api/files/${m.attachment!.id}`} target="_blank" rel="noreferrer" className="block truncate font-semibold text-navy-900 hover:underline">
+                      {m.attachment!.fileName}
+                    </a>
+                    <span className="block text-xs text-slate-500">
+                      {m.senderId === user.id ? "You" : m.sender.name} · {fmtDateTime(m.createdAt, tz)}
+                    </span>
+                  </span>
+                  <a href={`/api/files/${m.attachment!.id}?download=1`} className={buttonClass("secondary", "md")}>
+                    Download
+                  </a>
+                </li>
+              ))}
+            </ul>
+          )
+        ) : (
+          <ChatWindow
+            threadId={id}
+            initialMessages={messages}
+            initialCanPost={access.canPost}
+            initialReadOnlyReason={access.readOnlyReason}
+            send={sendMessageAction.bind(null, id)}
+            maxUploadMb={user.org.maxUploadMb}
+          />
         )}
       </Card>
     </>

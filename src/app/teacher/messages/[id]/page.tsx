@@ -4,8 +4,9 @@ import { PortalThread } from "@/components/portal/pages";
 
 export const metadata: Metadata = { title: "Conversation" };
 
-export default async function Page({ params }: PageProps<"/teacher/messages/[id]">) {
+export default async function Page({ params, searchParams }: PageProps<"/teacher/messages/[id]">) {
   const user = await requirePageUser("TEACHER");
   const { id } = await params;
-  return <PortalThread user={user} id={id} />;
+  const { tab } = await searchParams;
+  return <PortalThread user={user} id={id} tab={typeof tab === "string" ? tab : undefined} />;
 }

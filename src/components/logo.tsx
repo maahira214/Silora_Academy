@@ -1,7 +1,10 @@
 import { cx } from "@/components/ui";
 
-/** Wordmark in Silora brand colours. Replace with the official SVG logo when available. */
-export function Logo({ inverted, className }: { inverted?: boolean; className?: string }) {
+/**
+ * Wordmark in Silora brand colours. Replace with the official SVG logo when available.
+ * `compact` hides the words on very narrow phones so the header buttons fit.
+ */
+export function Logo({ inverted, compact, className }: { inverted?: boolean; compact?: boolean; className?: string }) {
   return (
     <span className={cx("inline-flex items-center gap-2", className)}>
       <svg viewBox="0 0 40 40" className="size-9 shrink-0" aria-hidden>
@@ -16,7 +19,7 @@ export function Logo({ inverted, className }: { inverted?: boolean; className?: 
           strokeLinecap="round"
         />
       </svg>
-      <span className={cx("flex flex-col leading-none font-extrabold tracking-tight", inverted ? "text-white" : "text-navy-800")}>
+      <span className={cx("flex-col leading-none font-extrabold tracking-tight", compact ? "hidden min-[400px]:flex" : "flex", inverted ? "text-white" : "text-navy-800")}>
         <span className="text-[15px]">SILORA</span>
         <span className="text-[15px]">ACADEMY</span>
       </span>
