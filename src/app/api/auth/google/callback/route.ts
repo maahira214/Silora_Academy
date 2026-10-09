@@ -3,7 +3,8 @@ import { cookies } from "next/headers";
 import { NextResponse, type NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { audit } from "@/lib/audit";
-import { createSession } from "@/lib/auth/session";
+import { clientIp, createSession } from "@/lib/auth/session";
+import { LIMITS, rateLimit } from "@/lib/rate-limit";
 import { googleClient } from "@/lib/auth/google";
 import { homeFor } from "@/lib/authz";
 
@@ -12,6 +13,7 @@ type GoogleClaims = { sub: string; email?: string; email_verified?: boolean; nam
 export async function GET(req: NextRequest) {
   const appUrl = process.env.APP_URL ?? req.nextUrl.origin;
   const fail = (code: string) => NextResponse.redirect(new URL(`/login?error=${code}`, appUrl));
+  if (!rateLimit(`signin:${clientIp(req.headers) ?? "unknown"}`, LIMITS.signIn).ok) return fail("too_many_attempts");
 
   const code = req.nextUrl.searchParams.get("code");
   const state = req.nextUrl.searchParams.get("state");

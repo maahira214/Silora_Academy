@@ -16,6 +16,7 @@ const ERRORS: Record<string, string> = {
   account_mismatch: "This email is linked to a different Google account. Please contact Silora Academy.",
   email_unverified: "Your Google email address isn't verified.",
   google_failed: "Google sign-in failed. Please try again.",
+  too_many_attempts: "Too many sign-in attempts. Please wait 10 minutes and try again.",
   invalid_request: "Your sign-in link expired. Please try again.",
   google_not_configured: "Google sign-in hasn't been configured yet (GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET).",
 };

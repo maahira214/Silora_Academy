@@ -7,6 +7,7 @@ import { UserError } from "@/lib/action-result";
 import type { CurrentUser } from "@/lib/auth/session";
 import { can, isStaffRole } from "@/lib/authz";
 import { detectContactInfo, FINDING_LABELS } from "@/lib/moderation";
+import { LIMITS, rateLimit, retryText } from "@/lib/rate-limit";
 import { notify } from "@/server/notifications";
 import { ALLOWED_UPLOADS, contentMatchesExtension, putObject } from "@/server/storage";
 
@@ -202,6 +203,13 @@ export async function sendMessage(user: CurrentUser, threadId: string, body: str
   const hasFile = !!file && file.size > 0;
   if (!text && !hasFile) throw new UserError("Write a message or attach a file.");
   if (text.length > 4000) throw new UserError("Message is too long (max 4000 characters).");
+
+  const sent = rateLimit(`message:${user.id}`, LIMITS.message);
+  if (!sent.ok) throw new UserError(`You're sending messages very fast. Please wait and try again ${retryText(sent.retryAfterMs)}.`);
+  if (hasFile) {
+    const up = rateLimit(`upload:${user.id}`, LIMITS.upload);
+    if (!up.ok) throw new UserError(`You've sent a lot of files. Please try again ${retryText(up.retryAfterMs)}.`);
+  }
 
   const org = user.org;
   let attachmentId: string | undefined;

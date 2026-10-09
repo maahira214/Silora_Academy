@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getCurrentUser } from "@/lib/auth/session";
+import { LIMITS, rateLimit } from "@/lib/rate-limit";
 import { getThreadAccess, listMessages, markThreadRead } from "@/server/chat";
 
 // Polled by the open chat window every few seconds for new messages.
@@ -7,6 +8,7 @@ export async function GET(req: NextRequest, ctx: RouteContext<"/api/threads/[id]
   const { id } = await ctx.params;
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  if (!rateLimit(`poll:${user.id}`, LIMITS.poll).ok) return NextResponse.json({ error: "too_many_requests" }, { status: 429 });
 
   const access = await getThreadAccess(user, id);
   if (!access) return NextResponse.json({ error: "not_found" }, { status: 404 });
