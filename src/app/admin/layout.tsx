@@ -22,6 +22,7 @@ export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
   if (can(user, "chat.review")) nav.push({ href: "/admin/moderation", label: "Chat review", icon: "shield", badge: flagged });
   // Rarely used pages sit under "More"
   if (can(user, "staff.manage")) nav.push({ href: "/admin/staff", label: "Staff", icon: "staff", more: true });
+  if (can(user, "recordings.view")) nav.push({ href: "/admin/recordings", label: "Recordings", icon: "video", more: true });
   nav.push({ href: "/admin/emails", label: "Emails", icon: "mail", more: true });
   if (can(user, "audit.view")) nav.push({ href: "/admin/audit", label: "Audit log", icon: "log", more: true });
   if (can(user, "settings.manage")) nav.push({ href: "/admin/settings", label: "Settings", icon: "settings", more: true });

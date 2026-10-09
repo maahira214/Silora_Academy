@@ -13,7 +13,8 @@ export default async function setup() {
   const db = new PrismaClient({ datasources: { db: { url: admin.toString() } } });
   try {
     await db.$executeRawUnsafe(`DROP DATABASE IF EXISTS "${name}" WITH (FORCE)`);
-    await db.$executeRawUnsafe(`CREATE DATABASE "${name}"`);
+    // UTF-8 like production, whatever the computer's own encoding is
+    await db.$executeRawUnsafe(`CREATE DATABASE "${name}" ENCODING 'UTF8' LC_COLLATE 'C' LC_CTYPE 'C' TEMPLATE template0`);
   } finally {
     await db.$disconnect();
   }

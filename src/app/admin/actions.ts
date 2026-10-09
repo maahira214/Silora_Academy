@@ -26,6 +26,7 @@ import {
 } from "@/server/courses";
 import { CONSENT_METHODS, changeStaffRole, createUser, setGuardianConsent, setUserStatus, updateUser, type UserInput } from "@/server/users";
 import { reviewMessage } from "@/server/chat";
+import { addRecording, confirmDriveDeleted, removeRecording } from "@/server/recordings";
 
 /* ---------- parsing helpers ---------- */
 
@@ -336,5 +337,34 @@ export async function removeGuardianConsentAction(studentId: string, _: ActionRe
     await setGuardianConsent(actor, studentId, null);
     revalidatePath("/admin", "layout");
     return { ok: true, message: "Parent consent removed. If the parent withdrew consent, deactivate the student's account." };
+  });
+}
+
+/* ---------- class recordings (Super Admin only) ---------- */
+
+export async function addRecordingAction(sessionId: string, _: ActionResult, fd: FormData): Promise<ActionResult> {
+  return runAction(async () => {
+    const actor = await requirePermission("recordings.view");
+    await addRecording(actor, sessionId, str(fd, "url"));
+    revalidatePath("/admin", "layout");
+    return { ok: true, message: "Recording added. Only Super Admins can open it." };
+  });
+}
+
+export async function removeRecordingAction(recordingId: string, _: ActionResult): Promise<ActionResult> {
+  return runAction(async () => {
+    const actor = await requirePermission("recordings.view");
+    await removeRecording(actor, recordingId);
+    revalidatePath("/admin", "layout");
+    return { ok: true, message: "Removed from Silora. Delete the file from Google Drive too." };
+  });
+}
+
+export async function confirmDriveDeletedAction(recordingId: string, _: ActionResult): Promise<ActionResult> {
+  return runAction(async () => {
+    const actor = await requirePermission("recordings.view");
+    await confirmDriveDeleted(actor, recordingId);
+    revalidatePath("/admin", "layout");
+    return { ok: true };
   });
 }

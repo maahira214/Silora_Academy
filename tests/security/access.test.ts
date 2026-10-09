@@ -207,6 +207,16 @@ describe("contact-detail leaks", () => {
   });
 });
 
+describe("text in any language", () => {
+  it("saves and shows messages in Hindi and with emoji exactly as typed", async () => {
+    const t = await thread(aaravMaths.id);
+    const text = "नमस्ते सर 🙏 सवाल 5 → समझ नहीं आया";
+    await sendMessage(aarav, t, text);
+    const shown = await listMessages(rahul, (await getThreadAccess(rahul, t))!);
+    expect(shown.at(-1)?.body).toBe(text);
+  });
+});
+
 describe("flood limits", () => {
   it("stops a user sending more than 30 messages a minute", async () => {
     const t = await thread(sarahPhysics.id);

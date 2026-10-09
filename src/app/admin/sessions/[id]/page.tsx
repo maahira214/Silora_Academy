@@ -7,6 +7,7 @@ import { fmt, fmtDate, fmtDateTime, fmtTime, localDateKey, minutesBetween } from
 import { loadSessions } from "@/server/sessions";
 import { cancelSessionAction, markSessionAction, rescheduleSessionAction } from "@/app/admin/actions";
 import { AlertList } from "@/components/alert-list";
+import { RecordingCard } from "../../_components/recording-card";
 import { ActionForm, Field, Input, Select, SubmitButton } from "@/components/forms";
 import { StatusBadge } from "@/components/session-table";
 import { Card, CardHeader, DefinitionList, Notice, PageHeader, Table, Td, Th, buttonClass } from "@/components/ui";
@@ -131,6 +132,10 @@ export default async function SessionPage({ params }: PageProps<"/admin/sessions
               />
             </div>
           </Card>
+
+          {can(user, "recordings.view") && s.status !== "CANCELLED" && (
+            <RecordingCard sessionId={s.id} timeZone={tz} lessonStarted={s.startsAt <= new Date()} />
+          )}
 
           {manage && editable && (
             <Card>

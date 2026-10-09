@@ -27,11 +27,14 @@ export const LEGAL = {
  * Class video recordings (made with Silora's paid Google Meet plan). Only Silora Academy can watch them.
  * CONFIRM: where they are kept, why, and for how long.
  */
+/** Recordings are removed from Silora after this many days (the monitor enforces it). */
+export const RECORDING_KEEP_DAYS = 90;
+
 export const RECORDINGS = {
   where: "in Silora Academy's own Google account (Google Drive)",
   why: "to check the quality of teaching, keep students safe, and look into complaints or problems",
-  who: "Only Silora Academy. Teachers and students cannot watch or download recordings, and recordings are never made public.",
-  keep: "90 days, unless needed longer to look into a complaint",
+  who: "Only Silora Academy's administrators, and every viewing is recorded. Teachers and students cannot watch or download recordings, and recordings are never made public.",
+  keep: `${RECORDING_KEEP_DAYS} days, unless needed longer to look into a complaint`,
 };
 
 /** "write to x@y" when a privacy inbox exists, otherwise how to reach the privacy contact. */
@@ -122,7 +125,7 @@ export const PRIVACY_SECTIONS: Section[] = [
     title: "Who can see your information",
     bullets: [
       "Teachers and students in the same class see each other's name (and the teacher's title), never phone numbers or email addresses.",
-      "Silora staff see what they need to run classes: account details, class schedules, attendance, class recordings and help requests.",
+      "Silora staff see what they need to run classes: account details, class schedules, attendance and help requests. Class recordings can only be watched by Silora Academy's administrators, and every viewing is recorded.",
       "Service providers who run parts of Silora for us, only to provide that part: Google (sign-in, Google Meet and storage of class recordings), Amazon Web Services (our server, in Mumbai, India), Cloudflare (storage for chat files and backups, in the Asia-Pacific region), Resend (sending emails) and Sentry (error reports, technical details only).",
       "Authorities, only when the law requires it.",
     ],

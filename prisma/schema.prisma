@@ -117,13 +117,14 @@ model Organization {
   allowPrivateGroupChat  Boolean       @default(true)
   maxUploadMb            Int           @default(15)
 
-  users     User[]
-  subjects  Subject[]
-  courses   Course[]
-  sessions  ClassSession[]
-  alerts    Alert[]
-  auditLogs AuditLog[]
-  emails    EmailLog[]
+  users      User[]
+  subjects   Subject[]
+  courses    Course[]
+  sessions   ClassSession[]
+  alerts     Alert[]
+  auditLogs  AuditLog[]
+  emails     EmailLog[]
+  recordings Recording[]
 }
 
 model User {
@@ -285,6 +286,7 @@ model ClassSession {
   schedule   Schedule?    @relation(fields: [scheduleId], references: [id], onDelete: SetNull)
   attendance Attendance[]
   alerts     Alert[]
+  recordings Recording[]
 
   // Idempotent generation from a recurring schedule (a moved lesson keeps its slot)
   @@unique([scheduleId, slotAt])
@@ -422,6 +424,29 @@ model AuditLog {
 
   @@index([orgId, createdAt])
   @@index([targetType, targetId])
+}
+
+/// A class video recording, kept in Silora's own Google Drive. Only Super Admins can open it
+/// (through /admin/recordings/[id], which records every viewing). Removed after RECORDING_KEEP_DAYS.
+model Recording {
+  id             String    @id @default(cuid())
+  orgId          String
+  sessionId      String
+  url            String // Google Drive link
+  source         String    @default("MANUAL") // MANUAL (link added by staff) or GOOGLE_API (attached automatically)
+  addedById      String?
+  createdAt      DateTime  @default(now())
+  expiresAt      DateTime
+  removedAt      DateTime?
+  removedNote    String? // why: expired, removed by staff…
+  /// When staff confirmed the file was also deleted from Google Drive (automatic once the Meet API is connected)
+  driveDeletedAt DateTime?
+
+  org     Organization @relation(fields: [orgId], references: [id])
+  session ClassSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, removedAt, expiresAt])
+  @@index([sessionId])
 }
 
 enum EmailStatus {

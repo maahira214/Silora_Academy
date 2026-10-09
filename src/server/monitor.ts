@@ -5,6 +5,7 @@ import { finalOutcome } from "@/lib/session-status";
 import { fmtTime } from "@/lib/time";
 import { generateSessions } from "@/server/courses";
 import { deliverPendingEmails } from "@/server/email";
+import { expireRecordings } from "@/server/recordings";
 import { notify } from "@/server/notifications";
 import { sessionInclude, studentNames, withLiveStatus } from "@/server/sessions";
 
@@ -15,7 +16,7 @@ import { sessionInclude, studentNames, withLiveStatus } from "@/server/sessions"
  * peak times when many classes start at once.
  */
 export async function runMonitorTick(now = new Date(), opts: { extendSchedules?: boolean } = {}) {
-  const stats = { reminders: 0, alerts: 0, finalized: 0, generated: 0, emails: 0 };
+  const stats = { reminders: 0, alerts: 0, finalized: 0, generated: 0, emails: 0, recordingsExpired: 0 };
   const orgs = await db.organization.findMany();
 
   for (const org of orgs) {
@@ -111,6 +112,8 @@ export async function runMonitorTick(now = new Date(), opts: { extendSchedules?:
 
   // Email outbox: class changes queued since the last tick
   stats.emails = await deliverPendingEmails(now);
+  // Recordings older than the retention period leave Silora
+  stats.recordingsExpired = await expireRecordings(now);
   return stats;
 }
 

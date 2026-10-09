@@ -20,6 +20,8 @@ const PERMISSIONS = {
   "settings.manage": ["SUPER_ADMIN"],
   "audit.view": ["SUPER_ADMIN"],
   "chat.review": ["SUPER_ADMIN"],
+  // Class video recordings are for Silora Academy only: never teachers or students
+  "recordings.view": ["SUPER_ADMIN"],
   "chat.control": ["SUPER_ADMIN", "OPERATIONS"],
 } as const satisfies Record<string, readonly Role[]>;
 
