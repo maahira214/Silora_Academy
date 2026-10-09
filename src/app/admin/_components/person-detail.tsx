@@ -7,6 +7,7 @@ import { fmtDateTime } from "@/lib/time";
 import { setUserStatusAction, updatePersonAction } from "@/app/admin/actions";
 import { ActionForm, SubmitButton } from "@/components/forms";
 import { Badge, Card, CardHeader, EmptyState, Notice, PageHeader, Table, Td, Th } from "@/components/ui";
+import { ConsentCard } from "./consent-card";
 import { PersonForm } from "./person-form";
 import { STATUS_TONE } from "./people-list";
 
@@ -98,6 +99,8 @@ export async function PersonDetail({ user, id, role }: { user: CurrentUser; id: 
         </div>
 
         <div className="space-y-6">
+          <ConsentCard person={person} timeZone={tz} canEdit={can(user, "people.edit")} />
+
           <Card>
             <CardHeader title="Account access" />
             <div className="space-y-3 p-5 text-sm text-slate-600">

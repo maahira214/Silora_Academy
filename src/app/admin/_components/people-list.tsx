@@ -140,7 +140,10 @@ export async function PeopleList({
                   </Td>
                   <Td className="tabular-nums">{p.role === "TEACHER" ? p._count.teaching : p._count.enrollments}</Td>
                   <Td>
-                    <Badge tone={STATUS_TONE[p.status]}>{p.status.toLowerCase()}</Badge>
+                    <span className="flex flex-wrap gap-1">
+                      <Badge tone={STATUS_TONE[p.status]}>{p.status.toLowerCase()}</Badge>
+                      {p.role === "STUDENT" && !p.studentProfile?.guardianConsentAt && <Badge tone="danger">No parent consent</Badge>}
+                    </span>
                   </Td>
                   <Td className="text-xs text-slate-500">{p.lastLoginAt ? fmtDate(p.lastLoginAt, tz) : "Never"}</Td>
                 </tr>

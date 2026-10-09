@@ -3,6 +3,8 @@ import { AppShell } from "@/components/app-shell";
 import { totalUnread } from "@/server/chat";
 import { unreadNotificationCount } from "@/server/notifications";
 import { logout } from "@/app/login/actions";
+import { POLICY_VERSION } from "@/lib/legal";
+import { ConsentGate } from "@/components/portal/consent-gate";
 import { WelcomeCards } from "@/components/portal/welcome-cards";
 
 export default async function Layout({ children }: LayoutProps<"/student">) {
@@ -23,7 +25,11 @@ export default async function Layout({ children }: LayoutProps<"/student">) {
       logoutAction={logout}
     >
       {children}
-      {!user.welcomedAt && <WelcomeCards role="STUDENT" joinOpensMinutesBefore={user.org.joinOpensMinutesBefore} />}
+      {user.policyVersion !== POLICY_VERSION ? (
+        <ConsentGate role="STUDENT" updated={!!user.policyVersion} />
+      ) : (
+        !user.welcomedAt && <WelcomeCards role="STUDENT" joinOpensMinutesBefore={user.org.joinOpensMinutesBefore} />
+      )}
     </AppShell>
   );
 }

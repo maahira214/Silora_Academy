@@ -24,7 +24,7 @@ import {
   updateMeetLink,
   type ScheduleInput,
 } from "@/server/courses";
-import { changeStaffRole, createUser, setUserStatus, updateUser, type UserInput } from "@/server/users";
+import { CONSENT_METHODS, changeStaffRole, createUser, setGuardianConsent, setUserStatus, updateUser, type UserInput } from "@/server/users";
 import { reviewMessage } from "@/server/chat";
 
 /* ---------- parsing helpers ---------- */
@@ -314,5 +314,27 @@ export async function updateSettingsAction(_: ActionResult, fd: FormData): Promi
     await audit({ orgId: actor.orgId, actorId: actor.id, action: "SETTINGS_UPDATED", targetType: "Organization", targetId: actor.orgId, metadata: data });
     revalidatePath("/admin", "layout");
     return { ok: true, message: "Settings saved." };
+  });
+}
+
+/* ---------- parent/guardian consent ---------- */
+
+export async function recordGuardianConsentAction(studentId: string, _: ActionResult, fd: FormData): Promise<ActionResult> {
+  return runAction(async () => {
+    const actor = await requirePermission("people.edit");
+    const method = z.enum(CONSENT_METHODS, { message: "Choose how the parent agreed." }).parse(str(fd, "method"));
+    const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Choose the date they agreed.").parse(str(fd, "date"));
+    await setGuardianConsent(actor, studentId, { method, at: zonedToUtc(date, "12:00", actor.org.timezone) });
+    revalidatePath("/admin", "layout");
+    return { ok: true, message: "Parent consent recorded." };
+  });
+}
+
+export async function removeGuardianConsentAction(studentId: string, _: ActionResult): Promise<ActionResult> {
+  return runAction(async () => {
+    const actor = await requirePermission("people.edit");
+    await setGuardianConsent(actor, studentId, null);
+    revalidatePath("/admin", "layout");
+    return { ok: true, message: "Parent consent removed. If the parent withdrew consent, deactivate the student's account." };
   });
 }

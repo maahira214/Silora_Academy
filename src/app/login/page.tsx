@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth/session";
@@ -48,7 +49,12 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
             Join your classes, message your teacher or student and get class updates, all in one place.
           </p>
         </div>
-        <p className="text-xs text-navy-300">© {new Date().getFullYear()} Silora Academy</p>
+        <p className="text-xs text-navy-300">
+          © {new Date().getFullYear()} Silora Academy ·{" "}
+          <Link href="/privacy" className="underline hover:text-white">
+            Privacy policy
+          </Link>
+        </p>
         <div className="pointer-events-none absolute -right-24 -bottom-24 size-96 rounded-full bg-gold-500/10" />
       </div>
 
@@ -84,6 +90,11 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
 
             <p className="mt-6 text-center text-xs text-slate-500">
               Don&apos;t have access? Contact Silora Academy. Accounts are created by Silora only.
+            </p>
+            <p className="mt-2 text-center text-xs">
+              <Link href="/privacy" className="font-semibold text-gold-700 underline">
+                Privacy policy
+              </Link>
             </p>
           </Card>
 

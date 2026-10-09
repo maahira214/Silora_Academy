@@ -173,3 +173,26 @@ export async function changeStaffRole(actor: CurrentUser, userId: string, role: 
   await db.user.update({ where: { id: userId }, data: { role } });
   await audit({ orgId: actor.orgId, actorId: actor.id, action: "STAFF_ROLE_CHANGED", targetType: "User", targetId: userId, metadata: { role } });
 }
+
+export const CONSENT_METHODS = ["Signed form", "Email reply", "Online form", "WhatsApp message", "In person"] as const;
+
+/** Records (or clears, with method null) a parent/guardian's consent for a student. */
+export async function setGuardianConsent(actor: CurrentUser, studentId: string, consent: { method: string; at: Date } | null) {
+  if (!can(actor, "people.edit")) throw new UserError("You do not have permission to do that.");
+  const student = await db.user.findFirst({ where: { id: studentId, orgId: actor.orgId, role: "STUDENT" } });
+  if (!student) throw new UserError("Student not found.");
+  if (consent && consent.at.getTime() > Date.now() + 86_400_000) throw new UserError("The consent date can't be in the future.");
+  await db.studentProfile.upsert({
+    where: { userId: studentId },
+    update: { guardianConsentAt: consent?.at ?? null, guardianConsentMethod: consent?.method ?? null, guardianConsentById: consent ? actor.id : null },
+    create: { userId: studentId, guardianConsentAt: consent?.at, guardianConsentMethod: consent?.method, guardianConsentById: consent ? actor.id : null },
+  });
+  await audit({
+    orgId: actor.orgId,
+    actorId: actor.id,
+    action: consent ? "GUARDIAN_CONSENT_RECORDED" : "GUARDIAN_CONSENT_REMOVED",
+    targetType: "User",
+    targetId: studentId,
+    metadata: consent ? { method: consent.method, at: consent.at.toISOString() } : undefined,
+  });
+}

@@ -127,19 +127,21 @@ model Organization {
 }
 
 model User {
-  id          String     @id @default(cuid())
-  orgId       String
-  email       String     @unique // lower-cased Google account email used to sign in
-  name        String
-  role        Role
-  status      UserStatus @default(ACTIVE)
-  phone       String? // private: visible to Silora staff only
-  timezone    String? // falls back to the organization timezone
-  googleSub   String?    @unique
-  lastLoginAt DateTime?
-  welcomedAt  DateTime? // set when the user closes the first-time welcome cards
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  id               String     @id @default(cuid())
+  orgId            String
+  email            String     @unique // lower-cased Google account email used to sign in
+  name             String
+  role             Role
+  status           UserStatus @default(ACTIVE)
+  phone            String? // private: visible to Silora staff only
+  timezone         String? // falls back to the organization timezone
+  googleSub        String?    @unique
+  lastLoginAt      DateTime?
+  welcomedAt       DateTime? // set when the user closes the first-time welcome cards
+  policyVersion    String? // privacy policy version the user agreed to (src/lib/legal.ts)
+  policyAcceptedAt DateTime?
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
 
   org            Organization    @relation(fields: [orgId], references: [id])
   teacherProfile TeacherProfile?
@@ -173,6 +175,11 @@ model StudentProfile {
   guardianPhone String? // staff only
   guardianEmail String? // staff only
   notes         String? // staff only
+
+  // Parent/guardian consent for students under 18, recorded by Silora staff
+  guardianConsentAt     DateTime?
+  guardianConsentMethod String? // e.g. signed form, email reply
+  guardianConsentById   String? // staff member who recorded it
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

@@ -23,6 +23,7 @@ Tutoring operations platform for Silora Academy (siloraacademy.com): admin/opera
 2. Make it simple — built locally 2026-10-04 (all 11 screen changes from the build plan doc). Waiting for the user's own local test; the "done when" check (a teacher and a student join and send a photo with no instructions) happens once it's online.
 3. Connect Google Meet (free-Meet test, then Workspace automation if chosen).
 4. Real data (CSV import), email notifications, rate limits, security test pass — local parts built 2026-10-09 (confirmed by user): CSV import (/admin/people/import), email outbox (EmailLog, EMAIL_DRIVER log/resend, Admin → More → Emails), in-memory rate limits (src/lib/rate-limit.ts), `npm run test:security` (real DB, also in CI). **Still to do:** import the user's real teacher/student list, approve privacy + parent-consent text, Resend account at the end.
+   Privacy (2026-10-09): draft policy, consent points and parent-consent form live in `src/lib/legal.ts` (pages /privacy, /privacy/parent-consent). Teachers/students must agree before using the app (re-asked when `POLICY_VERSION` changes); staff record parent consent on the student page. **User must confirm:** wording, privacy email, grievance contact, response days, retention periods (retention is documented, not yet enforced by automatic deletion).
    Phase 3 (Google Meet) moved to the end with the other connections, since it needs Silora's real Google account.
 5. Pilot with 5–10 real classes for 2 weeks.
 6. Full rollout and handover.

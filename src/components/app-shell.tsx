@@ -91,6 +91,9 @@ export function AppShell({
         )}
       </nav>
       <div className="border-t border-navy-700 p-3">
+        <Link href="/privacy" target="_blank" className="mb-1 block px-2 text-xs text-navy-300 hover:text-white">
+          Privacy policy
+        </Link>
         <div className="flex items-center gap-3 rounded-xl px-2 py-2">
           <Avatar name={user.name} />
           <div className="min-w-0 flex-1">
@@ -152,7 +155,10 @@ export function AppShell({
               <div className="absolute right-0 top-12 w-56 rounded-2xl bg-white p-3 shadow-lg ring-1 ring-slate-200">
                 <div className="truncate px-2 font-semibold text-navy-900">{user.name}</div>
                 <div className="px-2 text-xs text-slate-500">{roleLabel}</div>
-                <form action={logoutAction} className="mt-2">
+                <Link href="/privacy" target="_blank" className="mt-2 block rounded-xl px-2 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100">
+                  Privacy policy
+                </Link>
+                <form action={logoutAction}>
                   <button className="flex w-full items-center gap-2 rounded-xl px-2 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100">
                     <Icon name="logout" /> Sign out
                   </button>

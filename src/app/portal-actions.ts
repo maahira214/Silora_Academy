@@ -6,6 +6,7 @@ import { db } from "@/lib/db";
 import { audit } from "@/lib/audit";
 import { getCourseAccess, requireUser } from "@/lib/authz";
 import { runAction, UserError, type ActionResult } from "@/lib/action-result";
+import { POLICY_VERSION } from "@/lib/legal";
 import { openPrivateThread, sendMessage } from "@/server/chat";
 import { notify } from "@/server/notifications";
 
@@ -102,5 +103,13 @@ export async function requestHelpAction(_: ActionResult, fd: FormData): Promise<
 export async function finishWelcomeAction() {
   const user = await requireUser();
   await db.user.update({ where: { id: user.id }, data: { welcomedAt: new Date() } });
+  revalidatePath("/", "layout");
+}
+
+/** Records that the user agreed to the current privacy policy. */
+export async function acceptPolicyAction() {
+  const user = await requireUser();
+  await db.user.update({ where: { id: user.id }, data: { policyVersion: POLICY_VERSION, policyAcceptedAt: new Date() } });
+  await audit({ orgId: user.orgId, actorId: user.id, action: "POLICY_ACCEPTED", targetType: "User", targetId: user.id, metadata: { version: POLICY_VERSION } });
   revalidatePath("/", "layout");
 }
