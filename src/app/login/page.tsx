@@ -36,7 +36,7 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
   return (
     <div className="grid min-h-screen lg:grid-cols-2">
       <div className="relative hidden overflow-hidden bg-navy-800 p-12 text-white lg:flex lg:flex-col lg:justify-between">
-        <Logo inverted />
+        <Logo inverted className="h-16" />
         <div className="max-w-md">
           <span className="inline-flex rounded-full border border-gold-500/70 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-gold-400">
             Classes · Messages · Support
@@ -55,7 +55,7 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
       <div className="flex items-center justify-center bg-slate-50 p-4 sm:p-8">
         <div className="w-full max-w-md">
           <div className="mb-8 flex justify-center lg:hidden">
-            <Logo />
+            <Logo className="h-14" />
           </div>
           <Card className="p-8">
             <Eyebrow>Welcome back</Eyebrow>

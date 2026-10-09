@@ -69,7 +69,7 @@ export function AppShell({
     <div className="flex h-full flex-col bg-navy-800 text-navy-100">
       <div className="flex h-16 items-center px-5">
         <Link href={nav[0]?.href ?? "/"} onClick={() => setOpen(false)}>
-          <Logo inverted />
+          <Logo inverted className="h-11" />
         </Link>
       </div>
       <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">

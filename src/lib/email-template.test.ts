@@ -14,6 +14,7 @@ describe("renderEmail", () => {
     expect(e.text).toContain("Hello Aarav,");
     expect(e.text).toContain("Open Silora Academy: https://app.siloraacademy.com/classes/abc");
     expect(e.html).toContain('href="https://app.siloraacademy.com/classes/abc"');
+    expect(e.html).toContain('src="https://app.siloraacademy.com/brand/logo-dark.png"');
   });
 
   it("escapes text so names and class titles can't inject HTML", () => {

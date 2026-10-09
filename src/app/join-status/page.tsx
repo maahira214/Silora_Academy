@@ -20,7 +20,7 @@ export default async function JoinStatusPage({ searchParams }: PageProps<"/join-
     <div className="grid min-h-screen place-items-center bg-slate-50 p-4">
       <Card className="w-full max-w-md p-8 text-center">
         <div className="mb-6 flex justify-center">
-          <Logo />
+          <Logo className="h-12" />
         </div>
         <h1 className="text-xl font-bold text-navy-900">{msg.title}</h1>
         <p className="mt-2 text-sm text-slate-600">{msg.body}</p>
