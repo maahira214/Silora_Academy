@@ -72,6 +72,9 @@ export async function PeopleList({
         subtitle={count}
         actions={
           <>
+            <ButtonLink href="/admin/people/import" variant="secondary">
+              Import from spreadsheet
+            </ButtonLink>
             <ButtonLink href="/admin/teachers/new" variant="secondary">
               + Add teacher
             </ButtonLink>
