@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { LEGAL, PRIVACY_SECTIONS } from "@/lib/legal";
+import { HOW_TO_CONTACT, LEGAL, PRIVACY_SECTIONS } from "@/lib/legal";
 
 export const metadata: Metadata = { title: "Privacy policy" };
 
@@ -12,11 +12,7 @@ export default function PrivacyPage() {
       </p>
       <p className="mt-6 text-base leading-relaxed text-slate-700">
         This explains what information the {LEGAL.academy} app keeps about teachers, students and parents, why, who can see it and how
-        long we keep it. We have written it in plain words. If anything is unclear, write to{" "}
-        <a href={`mailto:${LEGAL.privacyEmail}`} className="font-semibold text-gold-700 underline">
-          {LEGAL.privacyEmail}
-        </a>
-        .
+        long we keep it. We have written it in plain words. If anything is unclear, {HOW_TO_CONTACT}.
       </p>
 
       <nav aria-label="Contents" className="mt-6 rounded-xl bg-slate-50 p-4 text-sm">
