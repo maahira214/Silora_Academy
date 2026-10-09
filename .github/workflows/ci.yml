@@ -1,4 +1,4 @@
-# Checks every push and pull request: types, lint, tests and a production build.
+# Checks every push and pull request: types, lint, unit tests, security tests and a production build.
 name: CI
 on:
   push:
@@ -8,6 +8,14 @@ on:
 jobs:
   check:
     runs-on: ubuntu-latest
+    services:
+      # Throwaway database for the security tests (same major version as production)
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -19,4 +27,7 @@ jobs:
       - run: npm run typecheck
       - run: npm run lint
       - run: npm test
+      - run: npm run test:security
+        env:
+          TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/silora_test
       - run: npm run build

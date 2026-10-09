@@ -22,7 +22,8 @@ Tutoring operations platform for Silora Academy (siloraacademy.com): admin/opera
 1. Test site online — confirmed 2026-10-03 and re-scoped: server-independent parts built (git, R2 storage, Sentry, /api/health, R2 backups, Docker Compose + Caddy, CI/deploy workflows, create-admin script; see deploy/README.md). **Remaining, at the end:** user creates accounts (R2, Google OAuth, Sentry, GitHub), then Lightsail server + one DNS record via the website developer.
 2. Make it simple — built locally 2026-10-04 (all 11 screen changes from the build plan doc). Waiting for the user's own local test; the "done when" check (a teacher and a student join and send a photo with no instructions) happens once it's online.
 3. Connect Google Meet (free-Meet test, then Workspace automation if chosen).
-4. Real data (CSV import), email notifications, rate limits, security test pass.
+4. Real data (CSV import), email notifications, rate limits, security test pass — local parts built 2026-10-09 (confirmed by user): CSV import (/admin/people/import), email outbox (EmailLog, EMAIL_DRIVER log/resend, Admin → More → Emails), in-memory rate limits (src/lib/rate-limit.ts), `npm run test:security` (real DB, also in CI). **Still to do:** import the user's real teacher/student list, approve privacy + parent-consent text, Resend account at the end.
+   Phase 3 (Google Meet) moved to the end with the other connections, since it needs Silora's real Google account.
 5. Pilot with 5–10 real classes for 2 weeks.
 6. Full rollout and handover.
 

@@ -38,6 +38,11 @@ With `DEV_LOGIN="true"` in `.env`, the login page lists the seeded users so you 
 This option is hard-disabled in production builds.
 
 Checks: `npm test` (unit tests), `npm run typecheck`, `npm run lint`, `npm run build`.
+`npm run test:security` runs the security checklist (wrong student or teacher, other academies, ended classes, suspended accounts, fake files, contact-detail leaks, email delivery) against a throwaway `silora_test` database. It needs `npm run db` running.
+
+Importing people: Admin → People → **Import from spreadsheet** (CSV with role, name, email and optional phone, grade, board…). Nothing is created until you confirm the preview.
+
+Emails: class changes and cancellations are emailed (chat messages and reminders stay in-app). Locally `EMAIL_DRIVER="log"` sends nothing; read them under Admin → More → Emails.
 
 Backups: `npm run backup` saves a copy of the database to `./backups` (newest 14 kept), `npm run backup:list` lists them, and `npm run backup:restore` restores the newest one.
 This needs the PostgreSQL command-line tools (version 17 or newer). On Windows they are found automatically in `C:Program FilesPostgreSQL`.

@@ -25,7 +25,8 @@ You create these yourself, in Silora's name. None of the values ever go into cha
    - Authorised redirect URIs: `https://app.siloraacademy.com/api/auth/google/callback`. For testing on your computer, also add `http://localhost:3000/api/auth/google/callback`.
    - OAuth consent screen: user type *External*, scopes `openid`, `email` and `profile` only. Set the publishing status to **In production**; in *Testing* mode only listed test users can sign in. These basic scopes need no Google review.
 3. **Sentry** (free plan). Create a *Next.js* project and copy its DSN.
-4. **GitHub.** Create a private repository and push this code (see "Code hosting" below).
+4. **Resend** (free plan, 100 emails a day). Add the domain `siloraacademy.com` and ask the website developer to add the DNS records Resend shows; this lets emails come from `classes@siloraacademy.com`. Create an API key with *Sending access* only. In `deploy/.env`, set `RESEND_API_KEY` and keep `EMAIL_DRIVER="resend"`.
+5. **GitHub.** Create a private repository and push this code (see "Code hosting" below).
 
 ## Connecting the server (at the end)
 
