@@ -9,7 +9,7 @@
  */
 
 /** Changing this asks every teacher and student to read and agree again. */
-export const POLICY_VERSION = "2026-10-09.2";
+export const POLICY_VERSION = "2026-10-09.3";
 
 export const LEGAL = {
   academy: "Silora Academy",
@@ -23,11 +23,14 @@ export const LEGAL = {
   lastUpdated: "9 October 2026",
 };
 
-/** Class video recordings. CONFIRM each line: where they are kept, why, who can watch, for how long. */
+/**
+ * Class video recordings (made with Silora's paid Google Meet plan). Only Silora Academy can watch them.
+ * CONFIRM: where they are kept, why, and for how long.
+ */
 export const RECORDINGS = {
   where: "in Silora Academy's own Google account (Google Drive)",
   why: "to check the quality of teaching, keep students safe, and look into complaints or problems",
-  who: "Silora Academy staff. A student, or their parent or guardian, can ask to watch the recordings of their own classes. Recordings are never made public.",
+  who: "Only Silora Academy. Teachers and students cannot watch or download recordings, and recordings are never made public.",
   keep: "90 days, unless needed longer to look into a complaint",
 };
 
@@ -136,7 +139,7 @@ export const PRIVACY_SECTIONS: Section[] = [
     bullets: [
       "Silora creates a student account only after a parent or guardian has agreed to this policy, including class recordings. Silora records when and how they agreed.",
       "We don't show ads to students, track their behaviour for marketing, or build profiles of them beyond what their classes need.",
-      `A parent or guardian can ask to see, correct or delete their child's information, watch their child's class recordings, or withdraw their consent. To do this, ${HOW_TO_CONTACT}. If consent is withdrawn, the student's account is closed.`,
+      `A parent or guardian can ask to see, correct or delete their child's information, or withdraw their consent. To do this, ${HOW_TO_CONTACT}. If consent is withdrawn, the student's account is closed.`,
     ],
   },
   {
@@ -181,7 +184,7 @@ export const PRIVACY_SECTIONS: Section[] = [
 /** The few points shown before someone agrees, linking to the full policy. */
 export const CONSENT_POINTS = [
   "Silora uses your information only to run your classes, messages and support.",
-  "Classes are video recorded. Recordings stay private to Silora Academy and are kept for a limited time.",
+  "Classes are video recorded. Only Silora Academy can watch the recordings, not teachers or students. They are kept for a limited time.",
   "Teachers and students never see each other's phone number or email.",
   "Messages are checked for phone numbers and other contact details. Flagged messages can be reviewed by Silora, and every review is recorded.",
   "Keep all communication on Silora. Don't share phone numbers, WhatsApp, email or social media.",
@@ -194,7 +197,7 @@ export const PARENT_CONSENT = {
   points: [
     "We will store your child's name, Google (Gmail) address, grade and board, and your name, phone number and email address.",
     "Your child will join classes through Silora, which opens Google Meet.",
-    `Classes are video recorded, including your child's picture and voice when their camera and microphone are on. Recordings are kept ${RECORDINGS.where}, ${RECORDINGS.why}. They are kept for ${RECORDINGS.keep}, are never made public, and you can ask to watch your child's recordings.`,
+    `Classes are video recorded, including your child's picture and voice when their camera and microphone are on. Recordings are kept ${RECORDINGS.where}, ${RECORDINGS.why}. Only Silora Academy can watch them; teachers and other students cannot. They are kept for ${RECORDINGS.keep} and are never made public.`,
     "Your child can message their teacher, and send photos and documents, inside Silora. Phone numbers and other contact details are never shown to the teacher, and messages that contain them are flagged.",
     "Silora administrators may review a conversation if a message is flagged, if someone reports a problem, or to keep your child safe. Every review is recorded.",
     "We don't sell your child's information, show them ads or track them for marketing.",
