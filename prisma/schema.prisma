@@ -123,6 +123,7 @@ model Organization {
   sessions  ClassSession[]
   alerts    Alert[]
   auditLogs AuditLog[]
+  emails    EmailLog[]
 }
 
 model User {
@@ -150,6 +151,7 @@ model User {
   messages       Message[]
   threadReads    ThreadRead[]
   notifications  Notification[]
+  emails         EmailLog[]
   uploads        Attachment[]
 
   @@index([orgId, role, status])
@@ -413,6 +415,39 @@ model AuditLog {
 
   @@index([orgId, createdAt])
   @@index([targetType, targetId])
+}
+
+enum EmailStatus {
+  PENDING // waiting for the class monitor to deliver it
+  SENT // accepted by the email provider (production)
+  LOGGED // development: kept here only, never sent
+  SKIPPED // not sent, e.g. the daily email limit was reached
+  FAILED // gave up after several attempts
+}
+
+/// Every email the app sends, as an outbox: written when something happens,
+/// delivered by the class monitor each minute, kept as a record afterwards.
+model EmailLog {
+  id         String      @id @default(cuid())
+  orgId      String
+  userId     String?
+  toEmail    String
+  subject    String
+  text       String
+  html       String
+  status     EmailStatus @default(PENDING)
+  attempts   Int         @default(0)
+  error      String?
+  providerId String?
+  dedupeKey  String?     @unique
+  createdAt  DateTime    @default(now())
+  sentAt     DateTime?
+
+  org  Organization @relation(fields: [orgId], references: [id])
+  user User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+  @@index([orgId, createdAt])
 }
 
 model AuthSession {

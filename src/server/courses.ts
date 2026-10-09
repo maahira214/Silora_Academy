@@ -178,7 +178,7 @@ export async function createCourse(actor: CurrentUser, input: CreateCourseInput)
     body: `${course.title} has been added to your Silora classes.`,
     link: "/classes/" + course.id,
     dedupeKey: `course_created:${course.id}`,
-  });
+  }, { email: true });
   return course;
 }
 
@@ -247,7 +247,7 @@ export async function cancelSession(actor: CurrentUser, sessionId: string, reaso
   await audit({ orgId: actor.orgId, actorId: actor.id, action: "SESSION_CANCELLED", targetType: "ClassSession", targetId: s.id, metadata: { reason } });
   await notifyParticipants(s.courseId, {
     title: "Lesson cancelled",
-    body: `Your ${s.course.title} lesson on ${fmtDateTime(s.startsAt, s.course.timezone)} has been cancelled.`,
+    body: `Your ${s.course.title} lesson on ${fmtDateTime(s.startsAt, s.course.timezone)} has been cancelled.${reason ? ` Reason: ${reason}.` : ""}`,
     link: "/classes/" + s.courseId,
     dedupeKey: `cancelled:${s.id}`,
   });
@@ -370,7 +370,7 @@ export async function addStudentToGroup(actor: CurrentUser, courseId: string, st
   });
   await db.thread.updateMany({ where: { courseId, studentId, kind: "PRIVATE" }, data: { status: "ACTIVE" } });
   await audit({ orgId: actor.orgId, actorId: actor.id, action: "STUDENT_ADDED", targetType: "Course", targetId: courseId, metadata: { studentId } });
-  await notify([studentId], { title: "New class added", body: `You were added to ${course.title}.`, link: "/classes/" + courseId });
+  await notify([studentId], { title: "New class added", body: `You were added to ${course.title}.`, link: "/classes/" + courseId }, { email: true });
 }
 
 export async function removeStudentFromGroup(actor: CurrentUser, courseId: string, studentId: string) {
@@ -411,6 +411,7 @@ export async function participantIds(courseId: string) {
   return [c.teacherId, ...c.students.map((s) => s.studentId)];
 }
 
+/** Every participant notification is a class change or cancellation, so it is emailed too. */
 async function notifyParticipants(courseId: string, n: { title: string; body: string; link?: string; dedupeKey?: string }) {
-  await notify(await participantIds(courseId), n);
+  await notify(await participantIds(courseId), n, { email: true });
 }

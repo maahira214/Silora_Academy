@@ -1,5 +1,6 @@
 import "server-only";
 import { db } from "@/lib/db";
+import { queueEmails } from "@/server/email";
 
 /**
  * In-app notifications. Text is deliberately generic so nothing sensitive
@@ -8,7 +9,10 @@ import { db } from "@/lib/db";
 export async function notify(
   userIds: string[],
   n: { title: string; body: string; link?: string; dedupeKey?: string },
+  /** `email: true` also emails it (class changes and cancellations only; see server/email.ts). */
+  opts: { email?: boolean } = {},
 ) {
+  if (opts.email) await queueEmails(userIds, n);
   const unique = [...new Set(userIds)];
   if (!unique.length) return;
   await db.notification.createMany({
