@@ -36,7 +36,7 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
   return (
     <div className="grid min-h-screen lg:grid-cols-2">
       <div className="relative hidden overflow-hidden bg-navy-800 p-12 text-white lg:flex lg:flex-col lg:justify-between">
-        <Logo inverted className="h-16" />
+        <Logo inverted className="h-14" />
         <div className="max-w-md">
           <span className="inline-flex rounded-full border border-gold-500/70 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-gold-400">
             Classes · Messages · Support

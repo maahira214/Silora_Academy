@@ -24,7 +24,7 @@ export function renderEmail({
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;padding:24px 12px">
       <tr><td align="center">
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#ffffff;border-radius:16px;overflow:hidden">
-          <tr><td style="background:#0a2d4a;padding:16px 24px;color:#ffffff;font-weight:800;font-size:16px;letter-spacing:.5px"><img src="${escapeHtml(new URL("/brand/logo-dark.png", url).toString())}" alt="SILORA ACADEMY" height="44" style="display:block;height:44px;width:auto;border:0"></td></tr>
+          <tr><td style="background:#ffffff;padding:16px 24px;border-bottom:4px solid #e8b112;color:#0a2d4a;font-weight:800;font-size:16px;letter-spacing:.5px"><img src="${escapeHtml(new URL("/brand/logo-light.png", url).toString())}" alt="SILORA ACADEMY" height="44" style="display:block;height:44px;width:auto;border:0"></td></tr>
           <tr><td style="padding:24px">
             <p style="margin:0 0 12px;font-size:16px">Hello ${escapeHtml(first)},</p>
             <h1 style="margin:0 0 12px;font-size:20px;color:#0a2d4a">${escapeHtml(title)}</h1>
